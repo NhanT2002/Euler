@@ -25,7 +25,7 @@ std::tuple<double, double, double, double, double, double> conservativeVariableF
 
 int main() {
     // Read the PLOT3D mesh from a file
-    auto [x, y] = read_PLOT3D_mesh("../mesh/x.9");
+    auto [x, y] = read_PLOT3D_mesh("../mesh/x.6");
 
     // Output the dimensions and some values for verification
     std::cout << "Grid dimensions: " << x.size() << " x " << x[0].size() << std::endl;
@@ -43,12 +43,12 @@ int main() {
     constexpr double E = p_inf/((1.4-1)*rho) + 0.5*std::pow(Vitesse, 2);
 
     // SpatialDiscretization current_state(x, y, rho, u, v, E, T_inf, p_inf);
-    // current_state.run();
+    // current_state.run_even();
     // std::vector<std::vector<cell>> cells = current_state.cells;
     // cell cell_test = cells[2][2];
 
     TemporalDiscretization FVM(x, y, rho, u, v, E, T_inf, p_inf);
-    auto[q, q_vertex, Residuals] = FVM.RungeKutta(50000);
+    auto[q, q_vertex, Residuals] = FVM.RungeKutta(10002);
 
     TemporalDiscretization::save_checkpoint(q, {static_cast<int>(Residuals.size())}, Residuals, "checkpoint_test.txt");
     write_plot3d_2d(x, y, q_vertex, Mach, alpha, 0, 0, "test.xy", "test.q");

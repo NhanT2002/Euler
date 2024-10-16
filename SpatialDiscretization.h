@@ -32,7 +32,7 @@ public:
 
     static double Lambdac(const std::vector<double>& W, const std::vector<double>& n, const double& Ds);
 
-    void compute_Fc_DeltaS_Lambdac();
+    void compute_Fc_DeltaS();
 
     static std::tuple<double, double> compute_epsilon(const cell& cell_Im1, const cell& cell_I,
                                               const cell& cell_Ip1, const cell& cell_Ip2,
@@ -40,9 +40,13 @@ public:
 
     void compute_dissipation();
 
-    void compute_R();
+    void compute_R_c();
 
-    void run();
+    void compute_R_d();
+
+    void run_odd();
+
+    void run_even();
 };
 
 

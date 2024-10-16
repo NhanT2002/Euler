@@ -42,7 +42,9 @@ public:
 
     std::vector<double> D_1, D_2, D_3, D_4;
 
-    std::vector<double> R;
+    std::vector<double> R_c;
+    std::vector<double> R_d;
+    std::vector<double> R_d0;
 
 };
 

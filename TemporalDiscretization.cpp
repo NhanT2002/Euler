@@ -37,7 +37,7 @@ double TemporalDiscretization::compute_dt(const cell& cell_IJ, const double sigm
     double lambda_J = (std::abs(u_IJ * n_J[0] + v_IJ * n_J[1]) + c_IJ) * Ds_J;
 
     // Compute time step
-    double dt = sigma * cell_IJ.OMEGA / (lambda_I + lambda_J);
+    const double dt = sigma * cell_IJ.OMEGA / (lambda_I + lambda_J);
 
     return dt;
 }
@@ -186,11 +186,24 @@ std::tuple<std::vector<std::vector<std::vector<double>>>, std::vector<int>,
 std::tuple<std::vector<std::vector<std::vector<double>>>,
            std::vector<std::vector<std::vector<double>>>,
            std::vector<std::vector<double>>> TemporalDiscretization::RungeKutta(int it_max) {
-    current_state.run();
+
+    double a1 = 0.25; double b1 = 1.0;
+    double a2 = 0.1667; double b2 = 0.0;
+    double a3 = 0.3750; double b3 = 0.56;
+    double a4 = 0.5; double b4 = 0.0;
+    double a5 = 1.0; double b5 = 0.44;
 
     auto ny = current_state.cells.size();
     auto nx = current_state.cells[0].size();
     std::cout << ny << " " << nx << std::endl;
+
+    current_state.run_even();
+    // Initialize R_d0
+    for (int j = 2; j < ny - 2; ++j) {
+        for (int i = 0; i < nx; ++i) {
+            current_state.cells[j][i].R_d0 = current_state.cells[j][i].R_d;
+        }
+    }
 
     std::vector<std::vector<double>> Residuals;
     std::vector<int> iteration;
@@ -224,49 +237,57 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
             for (int j = 2; j < ny - 2; ++j) {
                 for (int i = 0; i < nx; ++i) {
                     double dt = compute_dt(current_state.cells[j][i]);
-                    std::vector<double> dW = vector_scale(-0.0533 * dt / current_state.cells[j][i].OMEGA, current_state.cells[j][i].R);
+                    const std::vector<double>& Rd0 = current_state.cells[j][i].R_d0;
+                    std::vector<double> dW = vector_scale(-a1 * dt / current_state.cells[j][i].OMEGA, vector_subtract(current_state.cells[j][i].R_c, Rd0));
                     current_state.cells[j][i].W = vector_add(current_state.cells[j][i].W, dW) ;
                 }
             }
-            current_state.run();
+            current_state.run_odd();
 
             // Stage 2
             for (int j = 2; j < ny - 2; ++j) {
                 for (int i = 0; i < nx; ++i) {
                     double dt = compute_dt(current_state.cells[j][i]);
-                    std::vector<double> dW = vector_scale(-0.1263 * dt / current_state.cells[j][i].OMEGA, current_state.cells[j][i].R);
+                    const std::vector<double>& Rd0 = current_state.cells[j][i].R_d0;
+                    std::vector<double> dW = vector_scale(-a2 * dt / current_state.cells[j][i].OMEGA, vector_subtract(current_state.cells[j][i].R_c, Rd0));
                     current_state.cells[j][i].W = vector_add(current_state.cells[j][i].W, dW) ;
                 }
             }
-            current_state.run();
+            current_state.run_even();
 
             // Stage 3
             for (int j = 2; j < ny - 2; ++j) {
                 for (int i = 0; i < nx; ++i) {
                     double dt = compute_dt(current_state.cells[j][i]);
-                    std::vector<double> dW = vector_scale(-0.2375 * dt / current_state.cells[j][i].OMEGA, current_state.cells[j][i].R);
+                    const std::vector<double> Rd20 = vector_add(vector_scale(b3, current_state.cells[j][i].R_d), vector_scale(1-b3, current_state.cells[j][i].R_d0));
+                    current_state.cells[j][i].R_d0 = Rd20;
+                    std::vector<double> dW = vector_scale(-a3 * dt / current_state.cells[j][i].OMEGA,vector_subtract(current_state.cells[j][i].R_c, Rd20));
                     current_state.cells[j][i].W = vector_add(current_state.cells[j][i].W, dW) ;
                 }
             }
-            current_state.run();
+            current_state.run_odd();
 
             // Stage 4
             for (int j = 2; j < ny - 2; ++j) {
                 for (int i = 0; i < nx; ++i) {
                     double dt = compute_dt(current_state.cells[j][i]);
-                    std::vector<double> dW = vector_scale(-0.4414 * dt / current_state.cells[j][i].OMEGA, current_state.cells[j][i].R);
+                    const std::vector<double>& Rd20 = current_state.cells[j][i].R_d0;
+                    std::vector<double> dW = vector_scale(-a4 * dt / current_state.cells[j][i].OMEGA, vector_subtract(current_state.cells[j][i].R_c, Rd20));
                     current_state.cells[j][i].W = vector_add(current_state.cells[j][i].W, dW) ;
                 }
             }
-            current_state.run();
+            current_state.run_even();
 
-            // Final update
+            // Stage 5, Final update
             for (int j = 2; j < ny - 2; ++j) {
                 for (int i = 0; i < nx; ++i) {
                     double dt = compute_dt(current_state.cells[j][i]);
-                    std::vector<double> Res = current_state.cells[j][i].R;
-                    std::vector<double> dW = vector_scale(-dt / current_state.cells[j][i].OMEGA, Res);
+                    const std::vector<double> Rd42 = vector_add(vector_scale(b5, current_state.cells[j][i].R_d), vector_scale(1-b5, current_state.cells[j][i].R_d0));
+                    current_state.cells[j][i].R_d0 = Rd42;
+                    std::vector<double> Res = vector_subtract(current_state.cells[j][i].R_c, Rd42);
+                    std::vector<double> dW = vector_scale(-a5 * dt / current_state.cells[j][i].OMEGA, Res);
                     current_state.cells[j][i].W = vector_add(current_state.cells[j][i].W, dW) ;
+
                     all_Res[j - 2][i] = Res;
                     all_dw[j - 2][i] = dW;
                     q[j - 2][i][0] = current_state.cells[j][i].W[0];
@@ -275,7 +296,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                     q[j - 2][i][3] = current_state.cells[j][i].W[3];
                 }
             }
-            current_state.run();
+            current_state.run_odd();
 
 
             // Compute L2 norm (placeholder logic)
@@ -295,7 +316,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
             std::cout << std::endl;
 
             // Check for convergence
-            if (*std::ranges::max_element(normalized_residuals) <= 3e-12) {
+            if (*std::ranges::max_element(normalized_residuals) <= 1e-11) {
                 break; // Exit the loop if convergence criterion is met
             }
 

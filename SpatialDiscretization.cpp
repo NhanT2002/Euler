@@ -203,7 +203,7 @@ double SpatialDiscretization::Lambdac(const std::vector<double>& W, const std::v
     return lambda;
 }
 
-void SpatialDiscretization::compute_Fc_DeltaS_Lambdac() {
+void SpatialDiscretization::compute_Fc_DeltaS() {
     const auto ny = cells.size();
     const auto nx = cells[0].size();
 
@@ -223,29 +223,6 @@ void SpatialDiscretization::compute_Fc_DeltaS_Lambdac() {
             cells[j][i].FcDS_2 = FcDs_2;
             cells[j][i].FcDS_3 = FcDs_3;
             cells[j][i].FcDS_4 = FcDs_4;
-        }
-    }
-
-    for (int j = 0; j < ny; ++j) {
-        for (int i = 0; i < nx; ++i) {
-            // Calculate Lambda values
-            std::vector<double> n1_n3 = vector_scale(0.5, vector_subtract(cells[j][i].n1, cells[j][i].n3));
-            std::vector<double> n2_n4 = vector_scale(0.5, vector_subtract(cells[j][i].n2, cells[j][i].n4));
-            std::vector<double> n3_n1 = vector_scale(0.5, vector_subtract(cells[j][i].n3, cells[j][i].n1));
-            std::vector<double> n4_n2 = vector_scale(0.5, vector_subtract(cells[j][i].n4, cells[j][i].n2));
-
-            double ds2_plus_ds4 = 0.5 * (cells[j][i].Ds2 + cells[j][i].Ds4);
-            double ds1_plus_ds3 = 0.5 * (cells[j][i].Ds1 + cells[j][i].Ds3);
-
-            // Compute Lambda values
-            cells[j][i].Lambda_1_I = Lambdac(cells[j][i].W, n1_n3, ds2_plus_ds4);
-            cells[j][i].Lambda_1_J = Lambdac(cells[j][i].W, n1_n3, ds1_plus_ds3);
-            cells[j][i].Lambda_2_I = Lambdac(cells[j][i].W, n2_n4, ds2_plus_ds4);
-            cells[j][i].Lambda_2_J = Lambdac(cells[j][i].W, n2_n4, ds1_plus_ds3);
-            cells[j][i].Lambda_3_I = Lambdac(cells[j][i].W, n3_n1, ds2_plus_ds4);
-            cells[j][i].Lambda_3_J = Lambdac(cells[j][i].W, n3_n1, ds1_plus_ds3);
-            cells[j][i].Lambda_4_I = Lambdac(cells[j][i].W, n4_n2, ds2_plus_ds4);
-            cells[j][i].Lambda_4_J = Lambdac(cells[j][i].W, n4_n2, ds1_plus_ds3);
         }
     }
 
@@ -276,6 +253,29 @@ std::tuple<double, double> SpatialDiscretization::compute_epsilon(const cell& ce
 void SpatialDiscretization::compute_dissipation() {
     const auto ny = cells.size();
     const auto nx = cells[0].size();
+
+    for (int j = 0; j < ny; ++j) {
+        for (int i = 0; i < nx; ++i) {
+            // Calculate Lambda values
+            std::vector<double> n1_n3 = vector_scale(0.5, vector_subtract(cells[j][i].n1, cells[j][i].n3));
+            std::vector<double> n2_n4 = vector_scale(0.5, vector_subtract(cells[j][i].n2, cells[j][i].n4));
+            std::vector<double> n3_n1 = vector_scale(0.5, vector_subtract(cells[j][i].n3, cells[j][i].n1));
+            std::vector<double> n4_n2 = vector_scale(0.5, vector_subtract(cells[j][i].n4, cells[j][i].n2));
+
+            double ds2_plus_ds4 = 0.5 * (cells[j][i].Ds2 + cells[j][i].Ds4);
+            double ds1_plus_ds3 = 0.5 * (cells[j][i].Ds1 + cells[j][i].Ds3);
+
+            // Compute Lambda values
+            cells[j][i].Lambda_1_I = Lambdac(cells[j][i].W, n1_n3, ds2_plus_ds4);
+            cells[j][i].Lambda_1_J = Lambdac(cells[j][i].W, n1_n3, ds1_plus_ds3);
+            cells[j][i].Lambda_2_I = Lambdac(cells[j][i].W, n2_n4, ds2_plus_ds4);
+            cells[j][i].Lambda_2_J = Lambdac(cells[j][i].W, n2_n4, ds1_plus_ds3);
+            cells[j][i].Lambda_3_I = Lambdac(cells[j][i].W, n3_n1, ds2_plus_ds4);
+            cells[j][i].Lambda_3_J = Lambdac(cells[j][i].W, n3_n1, ds1_plus_ds3);
+            cells[j][i].Lambda_4_I = Lambdac(cells[j][i].W, n4_n2, ds2_plus_ds4);
+            cells[j][i].Lambda_4_J = Lambdac(cells[j][i].W, n4_n2, ds1_plus_ds3);
+        }
+    }
 
     for (int j = 2; j < ny - 2; ++j) {
         for (int i = 0; i < nx; ++i) {
@@ -411,7 +411,7 @@ void SpatialDiscretization::compute_dissipation() {
     }
 }
 
-void SpatialDiscretization::compute_R() {
+void SpatialDiscretization::compute_R_c() {
     const auto ny = cells.size();
     const auto nx = cells[0].size();
 
@@ -425,28 +425,44 @@ void SpatialDiscretization::compute_R() {
             const std::vector<double>& FcDS_3 = current_cell.FcDS_3;
             const std::vector<double>& FcDS_4 = current_cell.FcDS_4;
 
+
+            current_cell.R_c = vector_add(vector_add(FcDS_1, FcDS_2), vector_add(FcDS_3, FcDS_4));
+
+        }
+    }
+}
+
+void SpatialDiscretization::compute_R_d() {
+    const auto ny = cells.size();
+    const auto nx = cells[0].size();
+
+    for (int j = 2; j < ny - 2; ++j) {
+        for (int i = 0; i < nx; ++i) {
+            cell& current_cell = cells[j][i];
+
             // Extract the dissipation vectors
             const std::vector<double>& D_1 = current_cell.D_1;
             const std::vector<double>& D_2 = current_cell.D_2;
             const std::vector<double>& D_3 = current_cell.D_3;
             const std::vector<double>& D_4 = current_cell.D_4;
 
-            std::vector<double> F1 = vector_subtract(FcDS_1, D_1);
-            std::vector<double> F2 = vector_subtract(FcDS_2, D_2);
-            std::vector<double> F3 = vector_subtract(FcDS_3, D_3);
-            std::vector<double> F4 = vector_subtract(FcDS_4, D_4);
-
-            current_cell.R = vector_add(vector_add(F1, F2), vector_add(F3, F4));
+            current_cell.R_d = vector_add(vector_add(D_1, D_2), vector_add(D_3, D_4));
 
         }
     }
 }
 
-
-void SpatialDiscretization::run() {
+void SpatialDiscretization::run_odd() {
     SpatialDiscretization::compute_dummy_cells();
-    SpatialDiscretization::compute_Fc_DeltaS_Lambdac();
+    SpatialDiscretization::compute_Fc_DeltaS();
+    SpatialDiscretization::compute_R_c();
+}
+
+void SpatialDiscretization::run_even() {
+    SpatialDiscretization::compute_dummy_cells();
+    SpatialDiscretization::compute_Fc_DeltaS();
     SpatialDiscretization::compute_dissipation();
-    SpatialDiscretization::compute_R();
+    SpatialDiscretization::compute_R_c();
+    SpatialDiscretization::compute_R_d();
 }
 

@@ -9,7 +9,7 @@ cell::cell(const double x1, const double y1, const double x2, const double y2, c
       s1(2), s2(2), s3(2), s4(2),
       W(4), FcDS_1(4), FcDS_2(4), FcDS_3(4), FcDS_4(4),
       D_1(4), D_2(4), D_3(4), D_4(4),
-      R(4) {
+      R_c(4), R_d(4), R_d0(4){
 
     // Cell volume
     OMEGA = 0.5*((x1-x3)*(y2-y4) + (x4-x2)*(y1-y3));
