@@ -18,8 +18,8 @@ SpatialDiscretization::SpatialDiscretization(const std::vector<std::vector<doubl
                           const double& T,
                           const double& p)
                               :x(x), y(y), rho(rho), u(u), v(v), E(E), T(T), p(p) {
-    ny = y.size();
-    nx = x[0].size();
+    ny = static_cast<int>(y.size());
+    nx = static_cast<int>(x[0].size());
     // Cells generation
     domain_cells.resize(ny - 1, std::vector<cell>(nx - 1));
 
@@ -40,10 +40,10 @@ SpatialDiscretization::SpatialDiscretization(const std::vector<std::vector<doubl
     farfield_cells.resize(2, std::vector<cell>(nx - 1));
 
     // Combine all cells
-    cells.resize(solid_wall_cells.size() + domain_cells.size() + farfield_cells.size());
-    std::copy(solid_wall_cells.begin(), solid_wall_cells.end(), cells.begin());
-    std::copy(domain_cells.begin(), domain_cells.end(), cells.begin() + solid_wall_cells.size());
-    std::copy(farfield_cells.begin(), farfield_cells.end(), cells.begin() + solid_wall_cells.size() + domain_cells.size());
+    cells.reserve(solid_wall_cells.size() + domain_cells.size() + farfield_cells.size());
+    std::copy(solid_wall_cells.begin(), solid_wall_cells.end(), std::back_inserter(cells));
+    std::copy(domain_cells.begin(), domain_cells.end(), std::back_inserter(cells));
+    std::copy(farfield_cells.begin(), farfield_cells.end(), std::back_inserter(cells));
 }
 
 void SpatialDiscretization::compute_dummy_cells() {
@@ -54,22 +54,22 @@ void SpatialDiscretization::compute_dummy_cells() {
         std::tie(std::ignore, std::ignore,std::ignore, std::ignore, std::ignore, p3) = conservative_variable_from_W(cells[3][i].W);
         std::tie(std::ignore, std::ignore,std::ignore, std::ignore, std::ignore, p4) = conservative_variable_from_W(cells[4][i].W);
 
-        double pw = (15 * p2 - 10 * p3 + 3 * p4) / 8.0; // Blazek
-        double p1 = 2 * pw - p2;
+        const double pw = (15 * p2 - 10 * p3 + 3 * p4) / 8.0; // Blazek
+        const double p1 = 2 * pw - p2;
         std::vector<double> vel = {u_val, v_val};
 
         std::vector<double> n = cells[2][i].n1;
 
         std::vector<std::vector<double>> R = { {-n[1], n[0]}, {n[0], n[1]} };
-        double q_t = -R[0][0] * vel[0] - R[0][1] * vel[1];
-        double q_n = -R[1][0] * vel[0] - R[1][1] * vel[1];
+        const double q_t = -R[0][0] * vel[0] - R[0][1] * vel[1];
+        const double q_n = -R[1][0] * vel[0] - R[1][1] * vel[1];
 
-        double y_eta = cells[2][i].s1[0] / cells[2][i].Ds1;
-        double x_eta = cells[2][i].s1[1] / cells[2][i].Ds1;
+        const double y_eta = cells[2][i].s1[0] / cells[2][i].Ds1;
+        const double x_eta = cells[2][i].s1[1] / cells[2][i].Ds1;
 
         // Swanson Turkel
-        double u_dummy = x_eta * q_t + y_eta * q_n;
-        double v_dummy = -y_eta * q_t + x_eta * q_n;
+        const double u_dummy = x_eta * q_t + y_eta * q_n;
+        const double v_dummy = -y_eta * q_t + x_eta * q_n;
 
 
         E_val = p1 / (1.4 - 1) / rho_val + 0.5 * (u_dummy * u_dummy + v_dummy * v_dummy);
@@ -87,8 +87,8 @@ void SpatialDiscretization::compute_dummy_cells() {
     // Farfield
     for (size_t i = 0; i < nx - 1; ++i) {
         auto [rho_val, u_val, v_val, E_val, T_val, p_val] = conservative_variable_from_W(cells[cells.size() - 3][i].W);
-        double c = std::sqrt(1.4 * 287 * T_val);
-        double M = std::sqrt(u_val * u_val + v_val * v_val) / c;
+        const double c = std::sqrt(1.4 * 287 * T_val);
+        const double M = std::sqrt(u_val * u_val + v_val * v_val) / c;
         std::vector<double> n = cells[cells.size() - 3][i].n3;
 
         if (u_val * n[0] + v_val * n[1] > 0) { // Out of cell
@@ -105,11 +105,11 @@ void SpatialDiscretization::compute_dummy_cells() {
                                              rho_val, u_val, v_val, E_val);
             }
             else {  // Subsonic
-                double p_b = this->p;  // Boundary pressure
-                double rho_b = rho_val + (p_b - p_val) / (c * c);
-                double u_b = u_val + n[0] * (p_val - p_b) / (rho_val * c);
-                double v_b = v_val + n[1] * (p_val - p_b) / (rho_val * c);
-                double E_b = p_b / ((1.4 - 1) * rho_b) + 0.5 * (u_b * u_b + v_b * v_b);
+                const double p_b = this->p;  // Boundary pressure
+                const double rho_b = rho_val + (p_b - p_val) / (c * c);
+                const double u_b = u_val + n[0] * (p_val - p_b) / (rho_val * c);
+                const double v_b = v_val + n[1] * (p_val - p_b) / (rho_val * c);
+                const double E_b = p_b / ((1.4 - 1) * rho_b) + 0.5 * (u_b * u_b + v_b * v_b);
 
                 std::vector<double> W_b = {rho_b, rho_b * u_b, rho_b * v_b, rho_b * E_b};
                 std::vector<double> W_a = {2 * W_b[0] - cells[cells.size() - 3][i].W[0],
@@ -145,11 +145,11 @@ void SpatialDiscretization::compute_dummy_cells() {
                                              x[ny - 1][i], y[ny - 1][i],
                                             this->rho, this->u, this->v, this->E);
             } else {  // Subsonic
-                double p_b = 0.5 * (this->p + p_val - rho_val * c * (n[0] * (this->u - u_val) + n[1] * (this->v - v_val)));
-                double rho_b = this->rho + (p_b - this->p) / (c * c);
-                double u_b = this->u - n[0] * (this->p - p_b) / (rho_val * c);
-                double v_b = this->v - n[1] * (this->p - p_b) / (rho_val * c);
-                double E_b = p_b / ((1.4 - 1) * rho_b) + 0.5 * (u_b * u_b + v_b * v_b);
+                const double p_b = 0.5 * (this->p + p_val - rho_val * c * (n[0] * (this->u - u_val) + n[1] * (this->v - v_val)));
+                const double rho_b = this->rho + (p_b - this->p) / (c * c);
+                const double u_b = this->u - n[0] * (this->p - p_b) / (rho_val * c);
+                const double v_b = this->v - n[1] * (this->p - p_b) / (rho_val * c);
+                const double E_b = p_b / ((1.4 - 1) * rho_b) + 0.5 * (u_b * u_b + v_b * v_b);
 
                 std::vector<double> W_b = {rho_b, rho_b * u_b, rho_b * v_b, rho_b * E_b};
                 std::vector<double> W_a = {2 * W_b[0] - cells[cells.size() - 3][i].W[0],
@@ -197,15 +197,15 @@ std::vector<double> SpatialDiscretization::FcDs(const std::vector<double>& W, co
 double SpatialDiscretization::Lambdac(const std::vector<double>& W, const std::vector<double>& n, const double& Ds) {
     auto [rho, u, v, E, T, p] = conservative_variable_from_W(W);
     double c = std::sqrt(1.4*287*T);
-    double V = n[0]*u + n[1]*v;
-    double lambda = (std::abs(V) + c)*Ds;
+    const double V = n[0]*u + n[1]*v;
+    const double lambda = (std::abs(V) + c)*Ds;
 
     return lambda;
 }
 
 void SpatialDiscretization::compute_Fc_DeltaS_Lambdac() {
-    int ny = cells.size();
-    int nx = cells[0].size();
+    const auto ny = cells.size();
+    const auto nx = cells[0].size();
 
     for (int j = 2; j < ny - 2; ++j) {
         for (int i = 0; i < nx; ++i) {
@@ -274,8 +274,8 @@ std::tuple<double, double> SpatialDiscretization::compute_epsilon(const cell& ce
 }
 
 void SpatialDiscretization::compute_dissipation() {
-    int ny = cells.size();
-    int nx = cells[0].size();
+    const auto ny = cells.size();
+    const auto nx = cells[0].size();
 
     for (int j = 2; j < ny - 2; ++j) {
         for (int i = 0; i < nx; ++i) {
@@ -290,21 +290,21 @@ void SpatialDiscretization::compute_dissipation() {
             cell& cell_IJm2 = cells[j - 2][i];
 
             // Lambda calculations
-            double Lambda_2_I = 0.5 * (cell_IJ.Lambda_2_I + cell_Ip1J.Lambda_2_I);
-            double Lambda_2_J = 0.5 * (cell_IJ.Lambda_2_J + cell_Ip1J.Lambda_2_J);
-            double Lambda_2_S = Lambda_2_I + Lambda_2_J;
+            const double Lambda_2_I = 0.5 * (cell_IJ.Lambda_2_I + cell_Ip1J.Lambda_2_I);
+            const double Lambda_2_J = 0.5 * (cell_IJ.Lambda_2_J + cell_Ip1J.Lambda_2_J);
+            const double Lambda_2_S = Lambda_2_I + Lambda_2_J;
 
-            double Lambda_3_J = 0.5 * (cell_IJ.Lambda_3_J + cell_IJp1.Lambda_3_J);
-            double Lambda_3_I = 0.5 * (cell_IJ.Lambda_3_I + cell_IJp1.Lambda_3_I);
-            double Lambda_3_S = Lambda_3_I + Lambda_3_J;
+            const double Lambda_3_J = 0.5 * (cell_IJ.Lambda_3_J + cell_IJp1.Lambda_3_J);
+            const double Lambda_3_I = 0.5 * (cell_IJ.Lambda_3_I + cell_IJp1.Lambda_3_I);
+            const double Lambda_3_S = Lambda_3_I + Lambda_3_J;
 
-            double Lambda_4_I = 0.5 * (cell_IJ.Lambda_4_I + cell_Im1J.Lambda_4_I);
-            double Lambda_4_J = 0.5 * (cell_IJ.Lambda_4_J + cell_Im1J.Lambda_4_J);
-            double Lambda_4_S = Lambda_4_I + Lambda_4_J;
+            const double Lambda_4_I = 0.5 * (cell_IJ.Lambda_4_I + cell_Im1J.Lambda_4_I);
+            const double Lambda_4_J = 0.5 * (cell_IJ.Lambda_4_J + cell_Im1J.Lambda_4_J);
+            const double Lambda_4_S = Lambda_4_I + Lambda_4_J;
 
-            double Lambda_1_J = 0.5 * (cell_IJ.Lambda_1_J + cell_IJm1.Lambda_1_J);
-            double Lambda_1_I = 0.5 * (cell_IJ.Lambda_1_I + cell_IJm1.Lambda_1_I);
-            double Lambda_1_S = Lambda_1_I + Lambda_1_J;
+            const double Lambda_1_J = 0.5 * (cell_IJ.Lambda_1_J + cell_IJm1.Lambda_1_J);
+            const double Lambda_1_I = 0.5 * (cell_IJ.Lambda_1_I + cell_IJm1.Lambda_1_I);
+            const double Lambda_1_S = Lambda_1_I + Lambda_1_J;
 
             cell_IJ.Lambda_1_S = Lambda_1_S;
             cell_IJ.Lambda_2_S = Lambda_2_S;
@@ -412,8 +412,8 @@ void SpatialDiscretization::compute_dissipation() {
 }
 
 void SpatialDiscretization::compute_R() {
-    int ny = cells.size();
-    int nx = cells[0].size();
+    const auto ny = cells.size();
+    const auto nx = cells[0].size();
 
     for (int j = 2; j < ny - 2; ++j) {
         for (int i = 0; i < nx; ++i) {

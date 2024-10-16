@@ -6,7 +6,7 @@
 #define TEMPORALDISCRETIZATION_H
 
 
-
+#include <string>
 #include "SpatialDiscretization.h"
 #include <vector>
 

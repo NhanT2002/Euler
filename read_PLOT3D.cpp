@@ -119,8 +119,8 @@ void write_plot3d_2d(
     const std::string& solution_filename)
 {
     // Get dimensions
-    int nj = x.size();
-    int ni = x[0].size();
+    auto nj = x.size();
+    auto ni = x[0].size();
 
     // Write grid file (2D.xy)
     std::ofstream grid_file(grid_filename);
@@ -168,13 +168,13 @@ void write_plot3d_2d(
 std::vector<std::vector<std::vector<double>>> cell_dummy_to_vertex_centered_airfoil(const std::vector<std::vector<std::vector<double>>>& q_cell)
 {
     // Get dimensions
-    int nj_cell = q_cell.size();
-    int ni_cell = q_cell[0].size();
-    int num_vars = q_cell[0][0].size();
+    const auto nj_cell = q_cell.size();
+    const auto ni_cell = q_cell[0].size();
+    const auto num_vars = q_cell[0][0].size();
 
     // The vertex-centered grid will be reduced in both directions to exclude the dummy cells
-    int ni_vertex = ni_cell + 1;
-    int nj_vertex = nj_cell - 1; // Excluding one dummy cell at the start and one at the end
+    const auto ni_vertex = ni_cell + 1;
+    const auto nj_vertex = nj_cell - 1; // Excluding one dummy cell at the start and one at the end
 
     // Initialize an array for vertex-centered data
     std::vector q_vertex(nj_vertex,

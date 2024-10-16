@@ -8,6 +8,7 @@
 #include <vector>
 #include <string>
 #include <iomanip>
+#include <cmath>
 
 TemporalDiscretization::TemporalDiscretization(const std::vector<std::vector<double>>& x,
                                                const std::vector<std::vector<double>>& y,
@@ -20,14 +21,14 @@ TemporalDiscretization::TemporalDiscretization(const std::vector<std::vector<dou
     : x(x), y(y), rho(rho), u(u), v(v), E(E), T(T), p(p),
       current_state(x, y, rho, u, v, E, T, p) {}
 
-double TemporalDiscretization::compute_dt(const cell& cell_IJ, double sigma) {
+double TemporalDiscretization::compute_dt(const cell& cell_IJ, const double sigma) {
     // Extract conservative variables from the cell
     auto [rho_IJ, u_IJ, v_IJ, E_IJ, T_IJ, p_IJ] = SpatialDiscretization::conservative_variable_from_W(cell_IJ.W);
     double c_IJ = std::sqrt(1.4 * 287 * T_IJ);  // Speed of sound
 
     // Calculate normal vectors and Ds
-    std::vector<double> n_I = vector_scale(0.5, vector_subtract(cell_IJ.n2, cell_IJ.n4));
-    std::vector<double> n_J = vector_scale(0.5, vector_subtract(cell_IJ.n1, cell_IJ.n3));
+    const std::vector<double> n_I = vector_scale(0.5, vector_subtract(cell_IJ.n2, cell_IJ.n4));
+    const std::vector<double> n_J = vector_scale(0.5, vector_subtract(cell_IJ.n1, cell_IJ.n3));
     double Ds_I = 0.5 * (cell_IJ.Ds2 + cell_IJ.Ds4);
     double Ds_J = 0.5 * (cell_IJ.Ds1 + cell_IJ.Ds3);
 
@@ -42,12 +43,12 @@ double TemporalDiscretization::compute_dt(const cell& cell_IJ, double sigma) {
 }
 
 std::vector<double> TemporalDiscretization::compute_L2_norm(const std::vector<std::vector<std::vector<double>>> &residuals) {
-    int m = residuals.size();          // Number of rows
-    int n = residuals[0].size();       // Number of columns
-    int num_components = residuals[0][0].size(); // Number of components (4)
+    const auto m = residuals.size();          // Number of rows
+    const auto n = residuals[0].size();       // Number of columns
+    const auto num_components = residuals[0][0].size(); // Number of components (4)
 
     std::vector<double> l2_norms(num_components, 0.0);
-    double N = static_cast<double>(m * n); // Total number of cells
+    const auto N = static_cast<double>(m * n); // Total number of cells
 
     for (int k = 0; k < num_components; ++k) {
         double sum = 0.0;
@@ -83,9 +84,9 @@ void TemporalDiscretization::save_checkpoint(const std::vector<std::vector<std::
     file << "\n";
 
     // Get dimensions for q
-    int nj = q.size();               // Number of rows (j)
-    int ni = q[0].size();            // Number of columns (i)
-    int nVars = q[0][0].size();      // Number of variables (e.g., density, momentum, energy)
+    const auto nj = q.size();               // Number of rows (j)
+    const auto ni = q[0].size();            // Number of columns (i)
+    const auto nVars = q[0][0].size();      // Number of variables (e.g., density, momentum, energy)
 
     // Write the solution vector q
     file << "Solution vector (q):\n";
@@ -187,13 +188,12 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
            std::vector<std::vector<double>>> TemporalDiscretization::RungeKutta(int it_max) {
     current_state.run();
 
-    int ny = current_state.cells.size();
-    int nx = current_state.cells[0].size();
+    auto ny = current_state.cells.size();
+    auto nx = current_state.cells[0].size();
     std::cout << ny << " " << nx << std::endl;
 
     std::vector<std::vector<double>> Residuals;
     std::vector<int> iteration;
-    std::vector<double> first_residual;
 
 
     Residuals = std::vector<std::vector<double>>{};
@@ -215,6 +215,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
     }
 
     try {
+        std::vector<double> first_residual;
         int it = 0;
         std::vector<double> normalized_residuals = {1, 1, 1, 1};
 
@@ -294,7 +295,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
             std::cout << std::endl;
 
             // Check for convergence
-            if (*std::max_element(normalized_residuals.begin(), normalized_residuals.end()) <= 3e-12) {
+            if (*std::ranges::max_element(normalized_residuals) <= 3e-12) {
                 break; // Exit the loop if convergence criterion is met
             }
 

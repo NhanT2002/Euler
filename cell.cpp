@@ -3,7 +3,7 @@
 #include <vector>
 #include <cmath>
 
-cell::cell(double x1, double y1, double x2, double y2, double x3, double y3, double x4, double y4, double rho, double u, double v, double E)
+cell::cell(const double x1, const double y1, const double x2, const double y2, const double x3, const double y3, const double x4, const double y4, double rho, const double u, const double v, const double E)
     : x1(x1), y1(y1), x2(x2), y2(y2), x3(x3), y3(y3), x4(x4), y4(y4),
       rho(rho), u(u), v(v), E(E),
       s1(2), s2(2), s3(2), s4(2),
