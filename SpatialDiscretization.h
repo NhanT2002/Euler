@@ -36,7 +36,7 @@ public:
 
     static std::tuple<double, double> compute_epsilon(const cell& cell_Im1, const cell& cell_I,
                                               const cell& cell_Ip1, const cell& cell_Ip2,
-                                              double k2 = 0.5, double k4 = 1.0/64.0);
+                                              double k2 = 0.5, double k4 = 1.0/32.0);
 
     void compute_dissipation();
 

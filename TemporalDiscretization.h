@@ -27,7 +27,7 @@ public:
                             const double& T,
                             const double& p);
 
-    static double compute_dt(const cell& cell_IJ, double sigma=0.25);
+    static double compute_dt(const cell& cell_IJ, double sigma=0.5);
 
     static std::vector<double> compute_L2_norm(const std::vector<std::vector<std::vector<double>>> &residuals);
 

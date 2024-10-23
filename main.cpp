@@ -25,12 +25,12 @@ std::tuple<double, double, double, double, double, double> conservativeVariableF
 
 int main() {
     // Read the PLOT3D mesh from a file
-    auto [x, y] = read_PLOT3D_mesh("../mesh/x.6");
+    auto [x, y] = read_PLOT3D_mesh("../mesh/x.9");
 
     // Output the dimensions and some values for verification
     std::cout << "Grid dimensions: " << x.size() << " x " << x[0].size() << std::endl;
 
-    constexpr double Mach = 0.8;
+    constexpr double Mach = 0.5;
     constexpr double alpha = 1.25*M_PI/180;
     constexpr double p_inf = 1E5;
     constexpr double T_inf = 288;
@@ -48,10 +48,10 @@ int main() {
     // cell cell_test = cells[2][2];
 
     TemporalDiscretization FVM(x, y, rho, u, v, E, T_inf, p_inf);
-    auto[q, q_vertex, Residuals] = FVM.RungeKutta(10002);
+    auto[q, q_vertex, Residuals] = FVM.RungeKutta(50000);
 
-    TemporalDiscretization::save_checkpoint(q, {static_cast<int>(Residuals.size())}, Residuals, "checkpoint_test.txt");
-    write_plot3d_2d(x, y, q_vertex, Mach, alpha, 0, 0, "test.xy", "test.q");
+    TemporalDiscretization::save_checkpoint(q, {static_cast<int>(Residuals.size())}, Residuals, "checkpoint_test_M05_alpha125_x6_4.txt");
+    write_plot3d_2d(x, y, q_vertex, Mach, alpha, 0, 0, "test_M05_alpha125_x6_4.xy", "test_M05_alpha125_x6_4.q");
     std::cout << "PLOT3D files written successfully." << std::endl;
 
 

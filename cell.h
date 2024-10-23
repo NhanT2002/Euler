@@ -28,10 +28,7 @@ public:
 
     std::vector<double> FcDS_1, FcDS_2, FcDS_3, FcDS_4;
 
-    double Lambda_1_I{}, Lambda_1_J{};
-    double Lambda_2_I{}, Lambda_2_J{};
-    double Lambda_3_I{}, Lambda_3_J{};
-    double Lambda_4_I{}, Lambda_4_J{};
+    double Lambda_I{}, Lambda_J{};
 
     double Lambda_1_S{}, Lambda_2_S{}, Lambda_3_S{}, Lambda_4_S{};
 

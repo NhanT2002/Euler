@@ -38,6 +38,7 @@ double TemporalDiscretization::compute_dt(const cell& cell_IJ, const double sigm
 
     // Compute time step
     const double dt = sigma * cell_IJ.OMEGA / (lambda_I + lambda_J);
+    // std::cout << dt << std::endl;
 
     return dt;
 }
@@ -300,7 +301,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
 
 
             // Compute L2 norm (placeholder logic)
-            std::vector<double> l2_norm = compute_L2_norm(all_Res);
+            std::vector<double> l2_norm = compute_L2_norm(all_dw);
 
             if (it == 0) {
               first_residual = l2_norm;
@@ -324,6 +325,8 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
             if (it%1000 == 0) {
                 save_checkpoint(q, iteration, Residuals);
             }
+
+
 
             it++;
 

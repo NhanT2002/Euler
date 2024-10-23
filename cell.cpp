@@ -36,8 +36,7 @@ cell::cell(const double x1, const double y1, const double x2, const double y2, c
     W = {rho, rho * u, rho * v, rho * E};
 
     // Initialize Lambda properties
-    Lambda_1_I = Lambda_1_J = Lambda_2_I = Lambda_2_J = 0.0;
-    Lambda_3_I = Lambda_3_J = Lambda_4_I = Lambda_4_J = 0.0;
+    Lambda_I = Lambda_J  = 0.0;
     Lambda_1_S = Lambda_2_S = Lambda_3_S = Lambda_4_S = 0.0;
 
     // Initialize epsilon properties

@@ -259,21 +259,13 @@ void SpatialDiscretization::compute_dissipation() {
             // Calculate Lambda values
             std::vector<double> n1_n3 = vector_scale(0.5, vector_subtract(cells[j][i].n1, cells[j][i].n3));
             std::vector<double> n2_n4 = vector_scale(0.5, vector_subtract(cells[j][i].n2, cells[j][i].n4));
-            std::vector<double> n3_n1 = vector_scale(0.5, vector_subtract(cells[j][i].n3, cells[j][i].n1));
-            std::vector<double> n4_n2 = vector_scale(0.5, vector_subtract(cells[j][i].n4, cells[j][i].n2));
 
             double ds2_plus_ds4 = 0.5 * (cells[j][i].Ds2 + cells[j][i].Ds4);
             double ds1_plus_ds3 = 0.5 * (cells[j][i].Ds1 + cells[j][i].Ds3);
 
             // Compute Lambda values
-            cells[j][i].Lambda_1_I = Lambdac(cells[j][i].W, n1_n3, ds2_plus_ds4);
-            cells[j][i].Lambda_1_J = Lambdac(cells[j][i].W, n1_n3, ds1_plus_ds3);
-            cells[j][i].Lambda_2_I = Lambdac(cells[j][i].W, n2_n4, ds2_plus_ds4);
-            cells[j][i].Lambda_2_J = Lambdac(cells[j][i].W, n2_n4, ds1_plus_ds3);
-            cells[j][i].Lambda_3_I = Lambdac(cells[j][i].W, n3_n1, ds2_plus_ds4);
-            cells[j][i].Lambda_3_J = Lambdac(cells[j][i].W, n3_n1, ds1_plus_ds3);
-            cells[j][i].Lambda_4_I = Lambdac(cells[j][i].W, n4_n2, ds2_plus_ds4);
-            cells[j][i].Lambda_4_J = Lambdac(cells[j][i].W, n4_n2, ds1_plus_ds3);
+            cells[j][i].Lambda_I = Lambdac(cells[j][i].W, n2_n4, ds2_plus_ds4);
+            cells[j][i].Lambda_J = Lambdac(cells[j][i].W, n1_n3, ds1_plus_ds3);
         }
     }
 
@@ -290,20 +282,20 @@ void SpatialDiscretization::compute_dissipation() {
             cell& cell_IJm2 = cells[j - 2][i];
 
             // Lambda calculations
-            const double Lambda_2_I = 0.5 * (cell_IJ.Lambda_2_I + cell_Ip1J.Lambda_2_I);
-            const double Lambda_2_J = 0.5 * (cell_IJ.Lambda_2_J + cell_Ip1J.Lambda_2_J);
+            const double Lambda_2_I = 0.5 * (cell_IJ.Lambda_I + cell_Ip1J.Lambda_I);
+            const double Lambda_2_J = 0.5 * (cell_IJ.Lambda_J + cell_Ip1J.Lambda_J);
             const double Lambda_2_S = Lambda_2_I + Lambda_2_J;
 
-            const double Lambda_3_J = 0.5 * (cell_IJ.Lambda_3_J + cell_IJp1.Lambda_3_J);
-            const double Lambda_3_I = 0.5 * (cell_IJ.Lambda_3_I + cell_IJp1.Lambda_3_I);
+            const double Lambda_3_J = 0.5 * (cell_IJ.Lambda_J + cell_IJp1.Lambda_J);
+            const double Lambda_3_I = 0.5 * (cell_IJ.Lambda_I + cell_IJp1.Lambda_I);
             const double Lambda_3_S = Lambda_3_I + Lambda_3_J;
 
-            const double Lambda_4_I = 0.5 * (cell_IJ.Lambda_4_I + cell_Im1J.Lambda_4_I);
-            const double Lambda_4_J = 0.5 * (cell_IJ.Lambda_4_J + cell_Im1J.Lambda_4_J);
+            const double Lambda_4_I = 0.5 * (cell_IJ.Lambda_I + cell_Im1J.Lambda_I);
+            const double Lambda_4_J = 0.5 * (cell_IJ.Lambda_J + cell_Im1J.Lambda_J);
             const double Lambda_4_S = Lambda_4_I + Lambda_4_J;
 
-            const double Lambda_1_J = 0.5 * (cell_IJ.Lambda_1_J + cell_IJm1.Lambda_1_J);
-            const double Lambda_1_I = 0.5 * (cell_IJ.Lambda_1_I + cell_IJm1.Lambda_1_I);
+            const double Lambda_1_J = 0.5 * (cell_IJ.Lambda_J + cell_IJm1.Lambda_J);
+            const double Lambda_1_I = 0.5 * (cell_IJ.Lambda_I + cell_IJm1.Lambda_I);
             const double Lambda_1_S = Lambda_1_I + Lambda_1_J;
 
             cell_IJ.Lambda_1_S = Lambda_1_S;
