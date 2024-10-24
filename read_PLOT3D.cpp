@@ -174,7 +174,7 @@ void write_plot3d_2d(
     }
     for (int j = 0; j < nj; ++j) {
         for (int i = 0; i < ni; ++i) {  // Reverse the order: i first, then j
-            solution_file << std::scientific << std::setprecision(16) << q[j][i][3]*U_ref*U_ref << "\n";
+            solution_file << std::scientific << std::setprecision(16) << q[j][i][3]*rho_ref*U_ref*U_ref << "\n";
         }
     }
     solution_file.close();  // Close the solution file
