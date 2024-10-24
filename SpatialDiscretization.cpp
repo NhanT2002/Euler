@@ -16,8 +16,10 @@ SpatialDiscretization::SpatialDiscretization(const std::vector<std::vector<doubl
                           const double& v,
                           const double& E,
                           const double& T,
-                          const double& p)
-                              :x(x), y(y), rho(rho), u(u), v(v), E(E), T(T), p(p) {
+                          const double& p,
+                          const double& T_ref,
+                          const double& U_ref)
+                              :x(x), y(y), rho(rho), u(u), v(v), E(E), T(T), p(p), T_ref(T_ref), U_ref(U_ref){
     ny = static_cast<int>(y.size());
     nx = static_cast<int>(x[0].size());
     // Cells generation
@@ -87,7 +89,7 @@ void SpatialDiscretization::compute_dummy_cells() {
     // Farfield
     for (size_t i = 0; i < nx - 1; ++i) {
         auto [rho_val, u_val, v_val, E_val, T_val, p_val] = conservative_variable_from_W(cells[cells.size() - 3][i].W);
-        const double c = std::sqrt(1.4 * 287 * T_val);
+        const double c = std::sqrt(1.4 * 287 * T_val*T_ref)/U_ref;
         const double M = std::sqrt(u_val * u_val + v_val * v_val) / c;
         std::vector<double> n = cells[cells.size() - 3][i].n3;
 
@@ -175,18 +177,18 @@ void SpatialDiscretization::compute_dummy_cells() {
 }
 
 // Define the conservative_variable_from_W function as per your requirements
-std::tuple<double, double, double, double, double, double> SpatialDiscretization::conservative_variable_from_W(const std::vector<double>& W) {
+std::tuple<double, double, double, double, double, double> SpatialDiscretization::conservative_variable_from_W(const std::vector<double>& W) const {
     // Implement the conversion from W to (rho, u, v, E)
     double rho = W[0];
     double u = W[1] / rho;
     double v = W[2] / rho;
     double E = W[3] / rho;
     double p = (1.4-1)*rho*(E-(u*u+v*v)/2);
-    double T = p/(rho*287);
+    double T = p/(rho*287)*U_ref*U_ref/T_ref;
     return std::make_tuple(rho, u, v, E, T, p);
 }
 
-std::vector<double> SpatialDiscretization::FcDs(const std::vector<double>& W, const std::vector<double>& n, const double& Ds) {
+std::vector<double> SpatialDiscretization::FcDs(const std::vector<double>& W, const std::vector<double>& n, const double& Ds) const {
     auto [rho, u, v, E, T, p] = conservative_variable_from_W(W);
     double V = n[0]*u + n[1]*v;
     double H = E + p/rho;
@@ -194,9 +196,9 @@ std::vector<double> SpatialDiscretization::FcDs(const std::vector<double>& W, co
     return {rho*V*Ds, (rho*u*V + n[0]*p)*Ds, (rho*v*V + n[1]*p)*Ds, rho*H*V*Ds};
 }
 
-double SpatialDiscretization::Lambdac(const std::vector<double>& W, const std::vector<double>& n, const double& Ds) {
+double SpatialDiscretization::Lambdac(const std::vector<double>& W, const std::vector<double>& n, const double& Ds) const {
     auto [rho, u, v, E, T, p] = conservative_variable_from_W(W);
-    double c = std::sqrt(1.4*287*T);
+    double c = std::sqrt(1.4*287*T*T_ref)/U_ref;
     const double V = n[0]*u + n[1]*v;
     const double lambda = (std::abs(V) + c)*Ds;
 

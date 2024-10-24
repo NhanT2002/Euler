@@ -17,14 +17,16 @@ TemporalDiscretization::TemporalDiscretization(const std::vector<std::vector<dou
                                                const double& v,
                                                const double& E,
                                                const double& T,
-                                               const double& p)
-    : x(x), y(y), rho(rho), u(u), v(v), E(E), T(T), p(p),
-      current_state(x, y, rho, u, v, E, T, p) {}
+                                               const double& p,
+                                               const double& T_ref,
+                                               const double& U_ref)
+    : x(x), y(y), rho(rho), u(u), v(v), E(E), T(T), p(p), T_ref(T_ref), U_ref(U_ref),
+      current_state(x, y, rho, u, v, E, T, p, T_ref, U_ref) {}
 
 double TemporalDiscretization::compute_dt(const cell& cell_IJ, const double sigma) {
     // Extract conservative variables from the cell
-    auto [rho_IJ, u_IJ, v_IJ, E_IJ, T_IJ, p_IJ] = SpatialDiscretization::conservative_variable_from_W(cell_IJ.W);
-    double c_IJ = std::sqrt(1.4 * 287 * T_IJ);  // Speed of sound
+    auto [rho_IJ, u_IJ, v_IJ, E_IJ, T_IJ, p_IJ] = current_state.SpatialDiscretization::conservative_variable_from_W(cell_IJ.W);
+    double c_IJ = std::sqrt(1.4 * 287 * T_IJ * T_ref)/U_ref;  // Speed of sound
 
     // Calculate normal vectors and Ds
     const std::vector<double> n_I = vector_scale(0.5, vector_subtract(cell_IJ.n2, cell_IJ.n4));

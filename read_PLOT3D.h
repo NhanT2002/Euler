@@ -20,6 +20,8 @@ void write_plot3d_2d(
     double alpha,
     double reyn,
     double time,
+    double rho_ref,
+    double U_ref,
     const std::string& grid_filename = "2D.xy",
     const std::string& solution_filename = "2D.q");
 

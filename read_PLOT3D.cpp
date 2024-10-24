@@ -115,6 +115,8 @@ void write_plot3d_2d(
     double alpha,
     double reyn,
     double time,
+    double rho_ref,
+    double U_ref,
     const std::string& grid_filename,
     const std::string& solution_filename)
 {
@@ -155,11 +157,24 @@ void write_plot3d_2d(
                   << alpha << " " << reyn << " " << time << "\n";
 
     // Write flow variables (density, x-momentum, y-momentum, energy)
-    for (int n = 0; n < 4; ++n) {  // Iterate over the 4 variables
-        for (int j = 0; j < nj; ++j) {
-            for (int i = 0; i < ni; ++i) {  // Reverse the order: i first, then j
-                solution_file << std::scientific << std::setprecision(16) << q[j][i][n] << "\n";
-            }
+    for (int j = 0; j < nj; ++j) {
+        for (int i = 0; i < ni; ++i) {  // Reverse the order: i first, then j
+            solution_file << std::scientific << std::setprecision(16) << q[j][i][0]*rho_ref << "\n";
+        }
+    }
+    for (int j = 0; j < nj; ++j) {
+        for (int i = 0; i < ni; ++i) {  // Reverse the order: i first, then j
+            solution_file << std::scientific << std::setprecision(16) << q[j][i][1]*rho_ref*U_ref << "\n";
+        }
+    }
+    for (int j = 0; j < nj; ++j) {
+        for (int i = 0; i < ni; ++i) {  // Reverse the order: i first, then j
+            solution_file << std::scientific << std::setprecision(16) << q[j][i][2]*rho_ref*U_ref << "\n";
+        }
+    }
+    for (int j = 0; j < nj; ++j) {
+        for (int i = 0; i < ni; ++i) {  // Reverse the order: i first, then j
+            solution_file << std::scientific << std::setprecision(16) << q[j][i][3]*U_ref*U_ref << "\n";
         }
     }
     solution_file.close();  // Close the solution file

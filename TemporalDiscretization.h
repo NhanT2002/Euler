@@ -15,19 +15,22 @@ public:
     std::vector<std::vector<double>> x;
     std::vector<std::vector<double>> y;
     double rho, u, v, E, T, p;
+    double T_ref, U_ref;
 
     SpatialDiscretization current_state;
 
     TemporalDiscretization(const std::vector<std::vector<double>>& x,
-                            const std::vector<std::vector<double>>& y,
-                            const double& rho,
-                            const double& u,
-                            const double& v,
-                            const double& E,
-                            const double& T,
-                            const double& p);
+                           const std::vector<std::vector<double>>& y,
+                           const double& rho,
+                           const double& u,
+                           const double& v,
+                           const double& E,
+                           const double& T,
+                           const double& p,
+                           const double& T_ref,
+                           const double& U_ref);
 
-    static double compute_dt(const cell& cell_IJ, double sigma=0.5);
+    double compute_dt(const cell& cell_IJ, double sigma=0.5);
 
     static std::vector<double> compute_L2_norm(const std::vector<std::vector<std::vector<double>>> &residuals);
 

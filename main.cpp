@@ -33,8 +33,8 @@ int main() {
     constexpr double Mach = 0.5;
     constexpr double alpha = 1.25*M_PI/180;
     constexpr double p_inf = 1E5;
-    constexpr double rho_inf = 1.20;
-    constexpr double T_inf = p_inf/(rho_inf*287);
+    constexpr double T_inf = 215.0;
+    constexpr double rho_inf = p_inf/(T_inf*287);
 
     constexpr double a = std::sqrt(1.4*287*T_inf);
     constexpr double Vitesse = Mach*a;
@@ -52,16 +52,16 @@ int main() {
     constexpr double T = 1.0;
     constexpr double p = 1.0;
 
-    // SpatialDiscretization current_state(x, y, rho, u, v, E, T_inf, p_inf);
-    // current_state.run_even();
-    // std::vector<std::vector<cell>> cells = current_state.cells;
-    // cell cell_test = cells[2][2];
+    SpatialDiscretization current_state(x, y, rho, u, v, E, T, p, T_inf, U_ref);
+    current_state.run_even();
+    std::vector<std::vector<cell>> cells = current_state.cells;
+    cell cell_test = cells[2][2];
 
-    TemporalDiscretization FVM(x, y, rho, u, v, E, T, p);
+    TemporalDiscretization FVM(x, y, rho, u, v, E, T, p, T_inf, U_ref);
     auto[q, q_vertex, Residuals] = FVM.RungeKutta(50000);
 
     TemporalDiscretization::save_checkpoint(q, {static_cast<int>(Residuals.size())}, Residuals, "checkpoint_test_M05_alpha125_x6_4.txt");
-    write_plot3d_2d(x, y, q_vertex, Mach, alpha, 0, 0, "test_M05_alpha125_x6_4.xy", "test_M05_alpha125_x6_4.q");
+    write_plot3d_2d(x, y, q_vertex, Mach, alpha, 0, 0, rho_inf, U_ref,"test_M05_alpha125_x6_4.xy", "test_M05_alpha125_x6_4.q");
     std::cout << "PLOT3D files written successfully." << std::endl;
 
 
