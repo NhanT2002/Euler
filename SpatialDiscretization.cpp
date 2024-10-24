@@ -232,7 +232,7 @@ void SpatialDiscretization::compute_Fc_DeltaS() {
 
 std::tuple<double, double> SpatialDiscretization::compute_epsilon(const cell& cell_Im1, const cell& cell_I,
                                                                  const cell& cell_Ip1, const cell& cell_Ip2,
-                                                                 double k2, double k4) {
+                                                                 double k2, double k4) const {
     // Retrieve pressure from the conservative variables (assuming the last element is pressure)
     double p_Im1, p_I, p_Ip1, p_Ip2;
     std::tie(std::ignore, std::ignore,std::ignore, std::ignore, std::ignore, p_Im1) = conservative_variable_from_W(cell_Im1.W);

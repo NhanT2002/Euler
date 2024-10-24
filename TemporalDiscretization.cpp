@@ -23,7 +23,7 @@ TemporalDiscretization::TemporalDiscretization(const std::vector<std::vector<dou
     : x(x), y(y), rho(rho), u(u), v(v), E(E), T(T), p(p), T_ref(T_ref), U_ref(U_ref),
       current_state(x, y, rho, u, v, E, T, p, T_ref, U_ref) {}
 
-double TemporalDiscretization::compute_dt(const cell& cell_IJ, const double sigma) {
+double TemporalDiscretization::compute_dt(const cell& cell_IJ, const double sigma) const {
     // Extract conservative variables from the cell
     auto [rho_IJ, u_IJ, v_IJ, E_IJ, T_IJ, p_IJ] = current_state.SpatialDiscretization::conservative_variable_from_W(cell_IJ.W);
     double c_IJ = std::sqrt(1.4 * 287 * T_IJ * T_ref)/U_ref;  // Speed of sound
