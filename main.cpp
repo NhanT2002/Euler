@@ -57,12 +57,12 @@ int main() {
     std::vector<std::vector<cell>> cells = current_state.cells;
     cell cell_test = cells[2][2];
 
-    TemporalDiscretization FVM(x, y, rho, u, v, E, T, p, T_inf, U_ref);
-    auto[q, q_vertex, Residuals] = FVM.RungeKutta(50000);
-
-    TemporalDiscretization::save_checkpoint(q, {static_cast<int>(Residuals.size())}, Residuals, "checkpoint_test_M05_alpha125_x6_4.txt");
-    write_plot3d_2d(x, y, q_vertex, Mach, alpha, 0, 0, rho_inf, U_ref,"test_M05_alpha125_x6_4.xy", "test_M05_alpha125_x6_4.q");
-    std::cout << "PLOT3D files written successfully." << std::endl;
+    // TemporalDiscretization FVM(x, y, rho, u, v, E, T, p, T_inf, U_ref);
+    // auto[q, q_vertex, Residuals] = FVM.RungeKutta(50000);
+    //
+    // TemporalDiscretization::save_checkpoint(q, {static_cast<int>(Residuals.size())}, Residuals, "checkpoint_test.txt");
+    // write_plot3d_2d(x, y, q_vertex, Mach, alpha, 0, 0, rho_inf, U_ref,"test.xy", "test.q");
+    // std::cout << "PLOT3D files written successfully." << std::endl;
 
 
     return 0;

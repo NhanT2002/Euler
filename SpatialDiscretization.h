@@ -6,15 +6,32 @@
 
 class SpatialDiscretization {
 public:
-    std::vector<std::vector<cell>> domain_cells;
-    std::vector<std::vector<cell>> solid_wall_cells;
-    std::vector<std::vector<cell>> farfield_cells;
-    std::vector<std::vector<cell>> cells;
+
+
+    std::vector<std::vector<double>> OMEGA;
+    std::vector<std::vector<std::vector<std::vector<double>>>> s;
+    std::vector<std::vector<std::vector<double>>> Ds;
+    std::vector<std::vector<std::vector<std::vector<double>>>> n;
+    std::vector<std::vector<std::vector<double>>> W;
+    std::vector<std::vector<std::vector<double>>> R_c;
+    std::vector<std::vector<std::vector<double>>> R_d;
+    std::vector<std::vector<std::vector<double>>> R_d0;
+    std::vector<std::vector<std::vector<std::vector<double>>>> flux;
+    std::vector<std::vector<std::vector<std::vector<double>>>> D;
+    std::vector<std::vector<std::vector<std::vector<double>>>> eps_2;
+    std::vector<std::vector<std::vector<std::vector<double>>>> eps_4;
+    std::vector<std::vector<double>> Lambda_I;
+    std::vector<std::vector<double>> Lambda_J;
 
     std::vector<std::vector<double>> x, y;
     double rho, u, v, E, T, p;
     double T_ref, U_ref;
     int ny, nx;
+
+    std::vector<std::vector<cell>> domain_cells;
+    std::vector<std::vector<cell>> solid_wall_cells;
+    std::vector<std::vector<cell>> farfield_cells;
+    std::vector<std::vector<cell>> cells;
 
     SpatialDiscretization(const std::vector<std::vector<double>>& x,
                           const std::vector<std::vector<double>>& y,

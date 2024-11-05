@@ -7,6 +7,24 @@
 #include <cmath>
 #include <tuple>
 
+template <typename T>
+T combineBoundaryValues(const T& solidWall, const T& interior, const T& farfield) {
+    T combined;
+    combined.reserve(2 * solidWall.size() + interior.size() + 2 * farfield.size());
+
+    // Insert `solidWall` twice
+    combined.insert(combined.end(), solidWall.begin(), solidWall.end());
+    combined.insert(combined.end(), solidWall.begin(), solidWall.end());
+
+    // Insert `interior`
+    combined.insert(combined.end(), interior.begin(), interior.end());
+
+    // Insert `farfield` twice
+    combined.insert(combined.end(), farfield.begin(), farfield.end());
+    combined.insert(combined.end(), farfield.begin(), farfield.end());
+
+    return combined;
+}
 
 
 SpatialDiscretization::SpatialDiscretization(const std::vector<std::vector<double>>& x,
@@ -22,158 +40,222 @@ SpatialDiscretization::SpatialDiscretization(const std::vector<std::vector<doubl
                               :x(x), y(y), rho(rho), u(u), v(v), E(E), T(T), p(p), T_ref(T_ref), U_ref(U_ref){
     ny = static_cast<int>(y.size());
     nx = static_cast<int>(x[0].size());
-    // Cells generation
-    domain_cells.resize(ny - 1, std::vector<cell>(nx - 1));
 
-    for (size_t j = 0; j < ny - 1; ++j) {
+    std::vector OMEGA_domain(ny - 1, std::vector<double>(nx - 1));
+    std::vector s_domain(ny - 1, std::vector(nx - 1, std::vector(2, std::vector<double>(2))));
+    std::vector Ds_domain(ny - 1, std::vector(nx - 1, std::vector<double>(2)));
+    std::vector n_domain(ny - 1, std::vector(nx - 1, std::vector(2, std::vector<double>(2))));
+    std::vector W_domain(ny - 1, std::vector(nx - 1, std::vector<double>(4)));
+
+    R_c.resize(ny - 1, std::vector(nx - 1, std::vector<double>(4)));
+    R_d.resize(ny - 1, std::vector(nx - 1, std::vector<double>(4)));
+    R_d0.resize(ny - 1, std::vector(nx - 1, std::vector<double>(4)));
+    flux.resize(ny - 1, std::vector(nx - 1, std::vector(2, std::vector<double>(2))));
+    D.resize(ny - 1, std::vector(nx - 1, std::vector(2, std::vector<double>(2))));
+    eps_2.resize(ny - 1, std::vector(nx - 1, std::vector(2, std::vector<double>(2))));
+    eps_4.resize(ny - 1, std::vector(nx - 1, std::vector(2, std::vector<double>(2))));
+    Lambda_I.resize(ny - 1 , std::vector<double>(nx - 1));
+    Lambda_J.resize(ny - 1 , std::vector<double>(nx - 1));
+    for (size_t j = 0; j < ny - 1 ; ++j) {
         for (size_t i = 0; i < nx - 1; ++i) {
-            domain_cells[j][i] = cell(x[j][i], y[j][i],
-                                       x[j][i + 1], y[j][i + 1],
-                                       x[j + 1][i + 1], y[j + 1][i + 1],
-                                       x[j + 1][i], y[j + 1][i],
-                                       rho, u, v, E);
+            const double& x1 = x[j][i];
+            const double& x2 = x[j][i+1];
+            const double& x3 = x[j+1][i+1];
+            const double& x4 = x[j+1][i];
+            const double& y1 = y[j][i];
+            const double& y2 = y[j][i+1];
+            const double& y3 = y[j+1][i+1];
+            const double& y4 = y[j+1][i];
+
+            // Calculate OMEGA
+            OMEGA_domain[j][i] = 0.5 * ((x1 - x3) * (y2 - y4) + (x4 - x2) * (y1 - y3));
+
+            // Set s and compute Ds using s values
+            s_domain[j][i][0] = {y2 - y1, x1 - x2};
+            s_domain[j][i][1] = {y1 - y4, x4 - x1};
+
+            // Length of s vectors
+            Ds_domain[j][i][0] = std::hypot(s_domain[j][i][0][0], s_domain[j][i][0][1]);
+            Ds_domain[j][i][1] = std::hypot(s_domain[j][i][1][0], s_domain[j][i][1][1]);
+
+            // Normal vectors
+            n_domain[j][i][0] = {s_domain[j][i][0][0] / Ds_domain[j][i][0], s_domain[j][i][0][1] / Ds_domain[j][i][0]};
+            n_domain[j][i][1] = {s_domain[j][i][1][0] / Ds_domain[j][i][1], s_domain[j][i][1][1] / Ds_domain[j][i][1]};
+
+            // Compute W
+            W_domain[j][i] = {rho, rho * u, rho * v, rho * E};
         }
     }
 
-    // Initialize solid wall cells (dummy cells)
-    solid_wall_cells.resize(2, std::vector<cell>(nx - 1));
+    std::vector OMEGA_solidWall(OMEGA_domain.begin(), OMEGA_domain.begin() + 1);
+    std::vector OMEGA_farfield(OMEGA_domain.end() - 1, OMEGA_domain.end());
 
-    // Initialize farfield cells (dummy cells)
-    farfield_cells.resize(2, std::vector<cell>(nx - 1));
+    std::vector s_solidWall(s_domain.begin(), s_domain.begin() + 1);
+    std::vector s_farfield(s_domain.end() - 1, s_domain.end());
+    std::vector Ds_solidWall(Ds_domain.begin(), Ds_domain.begin() + 1);
+    std::vector Ds_farfield(Ds_domain.end() - 1, Ds_domain.end());
+    std::vector n_solidWall(n_domain.begin(), n_domain.begin() + 1);
+    std::vector n_farfield(n_domain.end() - 1, n_domain.end());
+    std::vector W_solidWall(W_domain.begin(), W_domain.begin() + 1);
+    std::vector W_farfield(W_domain.end() - 1, W_domain.end());
 
-    // Combine all cells
-    cells.reserve(solid_wall_cells.size() + domain_cells.size() + farfield_cells.size());
-    std::copy(solid_wall_cells.begin(), solid_wall_cells.end(), std::back_inserter(cells));
-    std::copy(domain_cells.begin(), domain_cells.end(), std::back_inserter(cells));
-    std::copy(farfield_cells.begin(), farfield_cells.end(), std::back_inserter(cells));
+    for (size_t i = 0; i < nx - 1; ++i) {
+        const double& x1 = x[ny-1][i];
+        const double& x2 = x[ny-1][i+1];
+        const double& y1 = y[ny-1][i];
+        const double& y2 = y[ny-1][i+1];
+
+        // Set s and compute Ds using s values
+        s_farfield[0][i][0] = {y2 - y1, x1 - x2};
+
+        // Length of s vectors
+        Ds_farfield[0][i][0] = std::hypot(s_farfield[0][i][0][0], s_farfield[0][i][0][1]);
+
+        // Normal vectors
+        n_farfield[0][i][0] = {s_farfield[0][i][0][0] / Ds_farfield[0][i][0], s_farfield[0][i][0][1] / Ds_farfield[0][i][0]};
+    }
+
+
+    // Combine using the helper function
+    auto OMEGA = combineBoundaryValues(OMEGA_solidWall, OMEGA_domain, OMEGA_farfield);
+    auto s = combineBoundaryValues(s_solidWall, s_domain, s_farfield);
+    auto Ds = combineBoundaryValues(Ds_solidWall, Ds_domain, Ds_farfield);
+    auto n = combineBoundaryValues(n_solidWall, n_domain, n_farfield);
+    auto W = combineBoundaryValues(W_solidWall, W_domain, W_farfield);
+
 }
 
 void SpatialDiscretization::compute_dummy_cells() {
     // Solid wall
-    for (size_t i = 0; i < nx - 1; ++i) {
-        double p3, p4;
-        auto [rho_val, u_val, v_val, E_val, T_val, p2] = conservative_variable_from_W(cells[2][i].W);
-        std::tie(std::ignore, std::ignore,std::ignore, std::ignore, std::ignore, p3) = conservative_variable_from_W(cells[3][i].W);
-        std::tie(std::ignore, std::ignore,std::ignore, std::ignore, std::ignore, p4) = conservative_variable_from_W(cells[4][i].W);
-
-        const double pw = (15 * p2 - 10 * p3 + 3 * p4) / 8.0; // Blazek
-        const double p1 = 2 * pw - p2;
-        std::vector<double> vel = {u_val, v_val};
-
-        std::vector<double> n = cells[2][i].n1;
-
-        std::vector<std::vector<double>> R = { {-n[1], n[0]}, {n[0], n[1]} };
-        const double q_t = -R[0][0] * vel[0] - R[0][1] * vel[1];
-        const double q_n = -R[1][0] * vel[0] - R[1][1] * vel[1];
-
-        const double y_eta = cells[2][i].s1[0] / cells[2][i].Ds1;
-        const double x_eta = cells[2][i].s1[1] / cells[2][i].Ds1;
-
-        // Swanson Turkel
-        const double u_dummy = x_eta * q_t + y_eta * q_n;
-        const double v_dummy = -y_eta * q_t + x_eta * q_n;
-
-
-        E_val = p1 / (1.4 - 1) / rho_val + 0.5 * (u_dummy * u_dummy + v_dummy * v_dummy);
-
-        cells[0][i] = cell(x[0][i], y[0][i], x[0][i + 1], y[0][i + 1],
-                                       x[1][i + 1], y[1][i + 1],
-                                       x[1][i], y[1][i],
-                                       rho_val, u_dummy, v_dummy, E_val);
-        cells[1][i] = cell(x[0][i], y[0][i], x[0][i + 1], y[0][i + 1],
-                                       x[1][i + 1], y[1][i + 1],
-                                       x[1][i], y[1][i],
-                                       rho_val, u_dummy, v_dummy, E_val);
-    }
-
-    // Farfield
-    for (size_t i = 0; i < nx - 1; ++i) {
-        auto [rho_val, u_val, v_val, E_val, T_val, p_val] = conservative_variable_from_W(cells[cells.size() - 3][i].W);
-        const double c = std::sqrt(1.4 * 287 * T_val*T_ref)/U_ref;
-        const double M = std::sqrt(u_val * u_val + v_val * v_val) / c;
-        std::vector<double> n = cells[cells.size() - 3][i].n3;
-
-        if (u_val * n[0] + v_val * n[1] > 0) { // Out of cell
-            if (M >= 1) {
-                cells[cells.size()-1][i] = cell(x[ny - 2][i], y[ny - 2][i],
-                                             x[ny - 2][i + 1], y[ny - 2][i + 1],
-                                             x[ny - 1][i + 1], y[ny - 1][i + 1],
-                                             x[ny - 1][i], y[ny - 1][i],
-                                             rho_val, u_val, v_val, E_val);
-                cells[cells.size()-2][i] = cell(x[ny - 2][i], y[ny - 2][i],
-                                             x[ny - 2][i + 1], y[ny - 2][i + 1],
-                                             x[ny - 1][i + 1], y[ny - 1][i + 1],
-                                             x[ny - 1][i], y[ny - 1][i],
-                                             rho_val, u_val, v_val, E_val);
-            }
-            else {  // Subsonic
-                const double p_b = this->p;  // Boundary pressure
-                const double rho_b = rho_val + (p_b - p_val) / (c * c);
-                const double u_b = u_val + n[0] * (p_val - p_b) / (rho_val * c);
-                const double v_b = v_val + n[1] * (p_val - p_b) / (rho_val * c);
-                const double E_b = p_b / ((1.4 - 1) * rho_b) + 0.5 * (u_b * u_b + v_b * v_b);
-
-                std::vector<double> W_b = {rho_b, rho_b * u_b, rho_b * v_b, rho_b * E_b};
-                std::vector<double> W_a = {2 * W_b[0] - cells[cells.size() - 3][i].W[0],
-                                       2 * W_b[1] - cells[cells.size() - 3][i].W[1],
-                                       2 * W_b[2] - cells[cells.size() - 3][i].W[2],
-                                       2 * W_b[3] - cells[cells.size() - 3][i].W[3]};
-
-                auto [rho_a, u_a, v_a, E_a, T_a, p_a] = conservative_variable_from_W(W_a);
-
-
-                cells[cells.size()-1][i] = cell(x[ny - 2][i], y[ny - 2][i],
-                                             x[ny - 2][i + 1], y[ny - 2][i + 1],
-                                             x[ny - 1][i + 1], y[ny - 1][i + 1],
-                                             x[ny - 1][i], y[ny - 1][i],
-                                            rho_a, u_a, v_a, E_a);
-                cells[cells.size()-2][i] = cell(x[ny - 2][i], y[ny - 2][i],
-                                             x[ny - 2][i + 1], y[ny - 2][i + 1],
-                                             x[ny - 1][i + 1], y[ny - 1][i + 1],
-                                             x[ny - 1][i], y[ny - 1][i],
-                                            rho_a, u_a, v_a, E_a);
-            }
-        }
-        else {  // Moving into the cell
-            if (M >= 1) {  // Supersonic
-                cells[cells.size()-1][i] = cell(x[ny - 2][i], y[ny - 2][i],
-                                             x[ny - 2][i + 1], y[ny - 2][i + 1],
-                                             x[ny - 1][i + 1], y[ny - 1][i + 1],
-                                             x[ny - 1][i], y[ny - 1][i],
-                                            this->rho, this->u, this->v, this->E);
-                cells[cells.size()-2][i] = cell(x[ny - 2][i], y[ny - 2][i],
-                                             x[ny - 2][i + 1], y[ny - 2][i + 1],
-                                             x[ny - 1][i + 1], y[ny - 1][i + 1],
-                                             x[ny - 1][i], y[ny - 1][i],
-                                            this->rho, this->u, this->v, this->E);
-            } else {  // Subsonic
-                const double p_b = 0.5 * (this->p + p_val - rho_val * c * (n[0] * (this->u - u_val) + n[1] * (this->v - v_val)));
-                const double rho_b = this->rho + (p_b - this->p) / (c * c);
-                const double u_b = this->u - n[0] * (this->p - p_b) / (rho_val * c);
-                const double v_b = this->v - n[1] * (this->p - p_b) / (rho_val * c);
-                const double E_b = p_b / ((1.4 - 1) * rho_b) + 0.5 * (u_b * u_b + v_b * v_b);
-
-                std::vector<double> W_b = {rho_b, rho_b * u_b, rho_b * v_b, rho_b * E_b};
-                std::vector<double> W_a = {2 * W_b[0] - cells[cells.size() - 3][i].W[0],
-                                       2 * W_b[1] - cells[cells.size() - 3][i].W[1],
-                                       2 * W_b[2] - cells[cells.size() - 3][i].W[2],
-                                       2 * W_b[3] - cells[cells.size() - 3][i].W[3]};
-
-                auto [rho_a, u_a, v_a, E_a, T_a, p_a] = conservative_variable_from_W(W_a);
-
-                cells[cells.size()-1][i] = cell(x[ny - 2][i], y[ny - 2][i],
-                                             x[ny - 2][i + 1], y[ny - 2][i + 1],
-                                             x[ny - 1][i + 1], y[ny - 1][i + 1],
-                                             x[ny - 1][i], y[ny - 1][i],
-                                            rho_a, u_a, v_a, E_a);
-                cells[cells.size()-2][i] = cell(x[ny - 2][i], y[ny - 2][i],
-                                             x[ny - 2][i + 1], y[ny - 2][i + 1],
-                                             x[ny - 1][i + 1], y[ny - 1][i + 1],
-                                             x[ny - 1][i], y[ny - 1][i],
-                                            rho_a, u_a, v_a, E_a);
-            }
-        }
-    }
+    // for (size_t i = 0; i < nx - 1; ++i) {
+    //     double p3, p4;
+    //     auto [rho_val, u_val, v_val, E_val, T_val, p2] = conservative_variable_from_W(W[2][i]);
+    //     std::tie(std::ignore, std::ignore,std::ignore, std::ignore, std::ignore, p3) = conservative_variable_from_W(W[3][i]);
+    //     std::tie(std::ignore, std::ignore,std::ignore, std::ignore, std::ignore, p4) = conservative_variable_from_W(W[4][i]);
+    //
+    //     auto [rho_val, u_val, v_val, E_val, T_val, p2] = conservative_variable_from_W(cells[2][i].W);
+    //     std::tie(std::ignore, std::ignore,std::ignore, std::ignore, std::ignore, p3) = conservative_variable_from_W(cells[3][i].W);
+    //     std::tie(std::ignore, std::ignore,std::ignore, std::ignore, std::ignore, p4) = conservative_variable_from_W(cells[4][i].W);
+    //
+    //
+    //     const double pw = (15 * p2 - 10 * p3 + 3 * p4) / 8.0; // Blazek
+    //     const double p1 = 2 * pw - p2;
+    //     std::vector<double> vel = {u_val, v_val};
+    //
+    //     std::vector<double> n = cells[2][i].n1;
+    //
+    //     std::vector<std::vector<double>> R = { {-n[1], n[0]}, {n[0], n[1]} };
+    //     const double q_t = -R[0][0] * vel[0] - R[0][1] * vel[1];
+    //     const double q_n = -R[1][0] * vel[0] - R[1][1] * vel[1];
+    //
+    //     const double y_eta = cells[2][i].s1[0] / cells[2][i].Ds1;
+    //     const double x_eta = cells[2][i].s1[1] / cells[2][i].Ds1;
+    //
+    //     // Swanson Turkel
+    //     const double u_dummy = x_eta * q_t + y_eta * q_n;
+    //     const double v_dummy = -y_eta * q_t + x_eta * q_n;
+    //
+    //
+    //     E_val = p1 / (1.4 - 1) / rho_val + 0.5 * (u_dummy * u_dummy + v_dummy * v_dummy);
+    //
+    //     cells[0][i] = cell(x[0][i], y[0][i], x[0][i + 1], y[0][i + 1],
+    //                                    x[1][i + 1], y[1][i + 1],
+    //                                    x[1][i], y[1][i],
+    //                                    rho_val, u_dummy, v_dummy, E_val);
+    //     cells[1][i] = cell(x[0][i], y[0][i], x[0][i + 1], y[0][i + 1],
+    //                                    x[1][i + 1], y[1][i + 1],
+    //                                    x[1][i], y[1][i],
+    //                                    rho_val, u_dummy, v_dummy, E_val);
+    // }
+    //
+    // // Farfield
+    // for (size_t i = 0; i < nx - 1; ++i) {
+    //     auto [rho_val, u_val, v_val, E_val, T_val, p_val] = conservative_variable_from_W(cells[cells.size() - 3][i].W);
+    //     const double c = std::sqrt(1.4 * 287 * T_val*T_ref)/U_ref;
+    //     const double M = std::sqrt(u_val * u_val + v_val * v_val) / c;
+    //     std::vector<double> n = cells[cells.size() - 3][i].n3;
+    //
+    //     if (u_val * n[0] + v_val * n[1] > 0) { // Out of cell
+    //         if (M >= 1) {
+    //             cells[cells.size()-1][i] = cell(x[ny - 2][i], y[ny - 2][i],
+    //                                          x[ny - 2][i + 1], y[ny - 2][i + 1],
+    //                                          x[ny - 1][i + 1], y[ny - 1][i + 1],
+    //                                          x[ny - 1][i], y[ny - 1][i],
+    //                                          rho_val, u_val, v_val, E_val);
+    //             cells[cells.size()-2][i] = cell(x[ny - 2][i], y[ny - 2][i],
+    //                                          x[ny - 2][i + 1], y[ny - 2][i + 1],
+    //                                          x[ny - 1][i + 1], y[ny - 1][i + 1],
+    //                                          x[ny - 1][i], y[ny - 1][i],
+    //                                          rho_val, u_val, v_val, E_val);
+    //         }
+    //         else {  // Subsonic
+    //             const double p_b = this->p;  // Boundary pressure
+    //             const double rho_b = rho_val + (p_b - p_val) / (c * c);
+    //             const double u_b = u_val + n[0] * (p_val - p_b) / (rho_val * c);
+    //             const double v_b = v_val + n[1] * (p_val - p_b) / (rho_val * c);
+    //             const double E_b = p_b / ((1.4 - 1) * rho_b) + 0.5 * (u_b * u_b + v_b * v_b);
+    //
+    //             std::vector<double> W_b = {rho_b, rho_b * u_b, rho_b * v_b, rho_b * E_b};
+    //             std::vector<double> W_a = {2 * W_b[0] - cells[cells.size() - 3][i].W[0],
+    //                                    2 * W_b[1] - cells[cells.size() - 3][i].W[1],
+    //                                    2 * W_b[2] - cells[cells.size() - 3][i].W[2],
+    //                                    2 * W_b[3] - cells[cells.size() - 3][i].W[3]};
+    //
+    //             auto [rho_a, u_a, v_a, E_a, T_a, p_a] = conservative_variable_from_W(W_a);
+    //
+    //
+    //             cells[cells.size()-1][i] = cell(x[ny - 2][i], y[ny - 2][i],
+    //                                          x[ny - 2][i + 1], y[ny - 2][i + 1],
+    //                                          x[ny - 1][i + 1], y[ny - 1][i + 1],
+    //                                          x[ny - 1][i], y[ny - 1][i],
+    //                                         rho_a, u_a, v_a, E_a);
+    //             cells[cells.size()-2][i] = cell(x[ny - 2][i], y[ny - 2][i],
+    //                                          x[ny - 2][i + 1], y[ny - 2][i + 1],
+    //                                          x[ny - 1][i + 1], y[ny - 1][i + 1],
+    //                                          x[ny - 1][i], y[ny - 1][i],
+    //                                         rho_a, u_a, v_a, E_a);
+    //         }
+    //     }
+    //     else {  // Moving into the cell
+    //         if (M >= 1) {  // Supersonic
+    //             cells[cells.size()-1][i] = cell(x[ny - 2][i], y[ny - 2][i],
+    //                                          x[ny - 2][i + 1], y[ny - 2][i + 1],
+    //                                          x[ny - 1][i + 1], y[ny - 1][i + 1],
+    //                                          x[ny - 1][i], y[ny - 1][i],
+    //                                         this->rho, this->u, this->v, this->E);
+    //             cells[cells.size()-2][i] = cell(x[ny - 2][i], y[ny - 2][i],
+    //                                          x[ny - 2][i + 1], y[ny - 2][i + 1],
+    //                                          x[ny - 1][i + 1], y[ny - 1][i + 1],
+    //                                          x[ny - 1][i], y[ny - 1][i],
+    //                                         this->rho, this->u, this->v, this->E);
+    //         } else {  // Subsonic
+    //             const double p_b = 0.5 * (this->p + p_val - rho_val * c * (n[0] * (this->u - u_val) + n[1] * (this->v - v_val)));
+    //             const double rho_b = this->rho + (p_b - this->p) / (c * c);
+    //             const double u_b = this->u - n[0] * (this->p - p_b) / (rho_val * c);
+    //             const double v_b = this->v - n[1] * (this->p - p_b) / (rho_val * c);
+    //             const double E_b = p_b / ((1.4 - 1) * rho_b) + 0.5 * (u_b * u_b + v_b * v_b);
+    //
+    //             std::vector<double> W_b = {rho_b, rho_b * u_b, rho_b * v_b, rho_b * E_b};
+    //             std::vector<double> W_a = {2 * W_b[0] - cells[cells.size() - 3][i].W[0],
+    //                                    2 * W_b[1] - cells[cells.size() - 3][i].W[1],
+    //                                    2 * W_b[2] - cells[cells.size() - 3][i].W[2],
+    //                                    2 * W_b[3] - cells[cells.size() - 3][i].W[3]};
+    //
+    //             auto [rho_a, u_a, v_a, E_a, T_a, p_a] = conservative_variable_from_W(W_a);
+    //
+    //             cells[cells.size()-1][i] = cell(x[ny - 2][i], y[ny - 2][i],
+    //                                          x[ny - 2][i + 1], y[ny - 2][i + 1],
+    //                                          x[ny - 1][i + 1], y[ny - 1][i + 1],
+    //                                          x[ny - 1][i], y[ny - 1][i],
+    //                                         rho_a, u_a, v_a, E_a);
+    //             cells[cells.size()-2][i] = cell(x[ny - 2][i], y[ny - 2][i],
+    //                                          x[ny - 2][i + 1], y[ny - 2][i + 1],
+    //                                          x[ny - 1][i + 1], y[ny - 1][i + 1],
+    //                                          x[ny - 1][i], y[ny - 1][i],
+    //                                         rho_a, u_a, v_a, E_a);
+    //         }
+    //     }
+    // }
 }
 
 // Define the conservative_variable_from_W function as per your requirements
