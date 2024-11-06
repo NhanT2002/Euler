@@ -52,10 +52,9 @@ int main() {
     constexpr double T = 1.0;
     constexpr double p = 1.0;
 
-    SpatialDiscretization current_state(x, y, rho, u, v, E, T, p, T_inf, U_ref);
+    // SpatialDiscretization current_state(x, y, rho, u, v, E, T, p, T_inf, U_ref);
+    SpatialDiscretization current_state(x, y, rho_inf, u_inf, v_inf, E_inf, T_inf, p_inf, 1, 1);
     current_state.run_even();
-    std::vector<std::vector<cell>> cells = current_state.cells;
-    cell cell_test = cells[2][2];
 
     // TemporalDiscretization FVM(x, y, rho, u, v, E, T, p, T_inf, U_ref);
     // auto[q, q_vertex, Residuals] = FVM.RungeKutta(50000);
@@ -68,3 +67,17 @@ int main() {
     return 0;
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+

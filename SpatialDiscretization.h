@@ -18,10 +18,11 @@ public:
     std::vector<std::vector<std::vector<double>>> R_d0;
     std::vector<std::vector<std::vector<std::vector<double>>>> flux;
     std::vector<std::vector<std::vector<std::vector<double>>>> D;
-    std::vector<std::vector<std::vector<std::vector<double>>>> eps_2;
-    std::vector<std::vector<std::vector<std::vector<double>>>> eps_4;
+    std::vector<std::vector<std::vector<double>>> eps_2;
+    std::vector<std::vector<std::vector<double>>> eps_4;
     std::vector<std::vector<double>> Lambda_I;
     std::vector<std::vector<double>> Lambda_J;
+    std::vector<std::vector<std::vector<double>>> Lambda_S;
 
     std::vector<std::vector<double>> x, y;
     double rho, u, v, E, T, p;
@@ -53,8 +54,8 @@ public:
     double Lambdac(const std::vector<double>& W, const std::vector<double>& n, const double& Ds) const;
 
     void compute_Fc_DeltaS();
-    std::tuple<double, double> compute_epsilon(const cell& cell_Im1, const cell& cell_I,
-                                              const cell& cell_Ip1, const cell& cell_Ip2,
+    std::tuple<double, double> compute_epsilon(const std::vector<double>& W_Im1, const std::vector<double>& W_I,
+                                              const std::vector<double>& W_Ip1, const std::vector<double>& W_Ip2,
                                               double k2 = 0.5, double k4 = 1.0/32.0) const;
 
     void compute_dissipation();
