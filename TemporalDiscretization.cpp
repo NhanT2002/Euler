@@ -316,6 +316,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
         while (it < it_max) {
             if (it < nx) {
                 // Stage 1
+                #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
                         double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
@@ -328,6 +329,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 current_state.run_odd();
 
                 // Stage 2
+                #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
                         double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
@@ -340,6 +342,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 current_state.run_even();
 
                 // Stage 3
+                #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
                         double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
@@ -353,6 +356,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 current_state.run_odd();
 
                 // Stage 4
+                #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
                         double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
@@ -365,6 +369,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 current_state.run_even();
 
                 // Stage 5, Final update
+                #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
                         double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
@@ -390,6 +395,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 std::vector d((ny - 4)*nx, std::vector<double>(4));
 
                 // Stage 1
+                #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
                         auto [eps_I, eps_J] = compute_eps(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
@@ -405,6 +411,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 }
                 std::vector<std::vector<double>> R_star = thomasAlgorithm(a_I, b_I, a_I, d);
                 std::vector<std::vector<double>> R_star_star = thomasAlgorithm(a_J, b_J, a_J, R_star);
+                #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
                         double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
@@ -416,6 +423,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 current_state.run_odd();
 
                 // Stage 2
+                #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
                         auto [eps_I, eps_J] = compute_eps(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
@@ -431,6 +439,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 }
                 R_star = thomasAlgorithm(a_I, b_I, a_I, d);
                 R_star_star = thomasAlgorithm(a_J, b_J, a_J, R_star);
+                #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
                         double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
@@ -442,6 +451,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 current_state.run_even();
 
                 // Stage 3
+                #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
                         auto [eps_I, eps_J] = compute_eps(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
@@ -458,6 +468,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 }
                 R_star = thomasAlgorithm(a_I, b_I, a_I, d);
                 R_star_star = thomasAlgorithm(a_J, b_J, a_J, R_star);
+                #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
                         double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
@@ -469,6 +480,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 current_state.run_odd();
 
                 // Stage 4
+                #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
                         auto [eps_I, eps_J] = compute_eps(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
@@ -484,6 +496,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 }
                 R_star = thomasAlgorithm(a_I, b_I, a_I, d);
                 R_star_star = thomasAlgorithm(a_J, b_J, a_J, R_star);
+                #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
                         double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
@@ -495,6 +508,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 current_state.run_even();
 
                 // Stage 5, Final update
+                #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
                         auto [eps_I, eps_J] = compute_eps(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
@@ -511,6 +525,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 }
                 R_star = thomasAlgorithm(a_I, b_I, a_I, d);
                 R_star_star = thomasAlgorithm(a_J, b_J, a_J, R_star);
+                #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
                         double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],

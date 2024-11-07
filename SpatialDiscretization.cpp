@@ -6,6 +6,7 @@
 #include <vector>
 #include <cmath>
 #include <tuple>
+#include <omp.h>
 
 template <typename T>
 T combineBoundaryValues(const T& solidWall, const T& interior, const T& farfield) {
@@ -57,6 +58,8 @@ SpatialDiscretization::SpatialDiscretization(const std::vector<std::vector<doubl
     Lambda_I.resize(ny - 1 + 4, std::vector<double>(nx - 1));
     Lambda_J.resize(ny - 1 + 4, std::vector<double>(nx - 1));
     Lambda_S.resize(ny - 1 + 4, std::vector(nx - 1, std::vector<double>(4)));
+
+    #pragma omp parallel for
     for (size_t j = 0; j < ny - 1 ; ++j) {
         for (size_t i = 0; i < nx - 1; ++i) {
             const double& x1 = x[j][i];
@@ -247,6 +250,7 @@ void SpatialDiscretization::compute_Fc_DeltaS() {
     const auto ny = W.size();
     const auto nx = W[0].size();
 
+    #pragma omp parallel for
     for (int j = 2; j < ny - 1; ++j) {
         for (int i = 0; i < nx; ++i) {
             std::vector<double> avg_W1 = vector_scale(0.5, vector_add(W[j][i], W[j - 1][i]));
@@ -288,6 +292,7 @@ void SpatialDiscretization::compute_dissipation() {
     const auto ny = W.size();
     const auto nx = W[0].size();
 
+    #pragma omp parallel for
     for (int j = 0; j < ny-1; ++j) {
         for (int i = 0; i < nx; ++i) {
             // Calculate Lambda values
@@ -303,6 +308,7 @@ void SpatialDiscretization::compute_dissipation() {
         }
     }
 
+    #pragma omp parallel for
     for (int j = 2; j < ny - 1; ++j) {
         for (int i = 0; i < nx; ++i) {
             std::vector<double>& W_IJ = W[j][i];
@@ -396,6 +402,7 @@ void SpatialDiscretization::compute_R_c() {
     const auto ny = W.size();
     const auto nx = W[0].size();
 
+    #pragma omp parallel for
     for (int j = 2; j < ny - 2; ++j) {
         for (int i = 0; i < nx; ++i) {
 
@@ -416,6 +423,7 @@ void SpatialDiscretization::compute_R_d() {
     const auto ny = W.size();
     const auto nx = W[0].size();
 
+    #pragma omp parallel for
     for (int j = 2; j < ny - 2; ++j) {
         for (int i = 0; i < nx; ++i) {
 
