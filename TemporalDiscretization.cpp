@@ -23,23 +23,33 @@ TemporalDiscretization::TemporalDiscretization(const std::vector<std::vector<dou
     : x(x), y(y), rho(rho), u(u), v(v), E(E), T(T), p(p), T_ref(T_ref), U_ref(U_ref),
       current_state(x, y, rho, u, v, E, T, p, T_ref, U_ref) {}
 
-double TemporalDiscretization::compute_dt(const cell& cell_IJ, const double sigma) const {
+double TemporalDiscretization::compute_dt(const std::vector<double>& W_IJ,
+                                          const double& OMEGA,
+                                          const std::vector<double>& n1,
+                                          const std::vector<double>& n2,
+                                          const std::vector<double>& n3,
+                                          const std::vector<double>& n4,
+                                          const double& Ds1,
+                                          const double& Ds2,
+                                          const double& Ds3,
+                                          const double& Ds4,
+                                          const double sigma) const {
     // Extract conservative variables from the cell
-    auto [rho_IJ, u_IJ, v_IJ, E_IJ, T_IJ, p_IJ] = current_state.SpatialDiscretization::conservative_variable_from_W(cell_IJ.W);
+    auto [rho_IJ, u_IJ, v_IJ, E_IJ, T_IJ, p_IJ] = current_state.SpatialDiscretization::conservative_variable_from_W(W_IJ);
     double c_IJ = std::sqrt(1.4 * 287 * T_IJ * T_ref)/U_ref;  // Speed of sound
 
     // Calculate normal vectors and Ds
-    const std::vector<double> n_I = vector_scale(0.5, vector_subtract(cell_IJ.n2, cell_IJ.n4));
-    const std::vector<double> n_J = vector_scale(0.5, vector_subtract(cell_IJ.n1, cell_IJ.n3));
-    double Ds_I = 0.5 * (cell_IJ.Ds2 + cell_IJ.Ds4);
-    double Ds_J = 0.5 * (cell_IJ.Ds1 + cell_IJ.Ds3);
+    const std::vector<double> n_I = vector_scale(0.5, vector_subtract(n2, n4));
+    const std::vector<double> n_J = vector_scale(0.5, vector_subtract(n1, n3));
+    double Ds_I = 0.5 * (Ds2 + Ds4);
+    double Ds_J = 0.5 * (Ds1 + Ds3);
 
     // Calculate lambda_I and lambda_J
     double lambda_I = (std::abs(u_IJ * n_I[0] + v_IJ * n_I[1]) + c_IJ) * Ds_I;
     double lambda_J = (std::abs(u_IJ * n_J[0] + v_IJ * n_J[1]) + c_IJ) * Ds_J;
 
     // Compute time step
-    const double dt = sigma * cell_IJ.OMEGA / (lambda_I + lambda_J);
+    const double dt = sigma * OMEGA / (lambda_I + lambda_J);
     // std::cout << dt << std::endl;
 
     return dt;
@@ -196,15 +206,15 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
     double a4 = 0.5; double b4 = 0.0;
     double a5 = 1.0; double b5 = 0.44;
 
-    auto ny = current_state.cells.size();
-    auto nx = current_state.cells[0].size();
+    auto ny = current_state.W.size();
+    auto nx = current_state.W[0].size();
     std::cout << ny << " " << nx << std::endl;
 
     current_state.run_even();
     // Initialize R_d0
     for (int j = 2; j < ny - 2; ++j) {
         for (int i = 0; i < nx; ++i) {
-            current_state.cells[j][i].R_d0 = current_state.cells[j][i].R_d;
+            current_state.R_d0[j-2][i] = current_state.R_d[j-2][i];
         }
     }
 
@@ -223,10 +233,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
     // Fill q array
     for (int j = 2; j < ny - 2; ++j) {
         for (int i = 0; i < nx; ++i) {
-            q[j - 2][i][0] = current_state.cells[j][i].W[0];
-            q[j - 2][i][1] = current_state.cells[j][i].W[1];
-            q[j - 2][i][2] = current_state.cells[j][i].W[2];
-            q[j - 2][i][3] = current_state.cells[j][i].W[3];
+            q[j - 2][i] = current_state.W[j][i];
         }
     }
 
@@ -239,10 +246,11 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
             // Stage 1
             for (int j = 2; j < ny - 2; ++j) {
                 for (int i = 0; i < nx; ++i) {
-                    double dt = compute_dt(current_state.cells[j][i]);
-                    const std::vector<double>& Rd0 = current_state.cells[j][i].R_d0;
-                    std::vector<double> dW = vector_scale(-a1 * dt / current_state.cells[j][i].OMEGA, vector_subtract(current_state.cells[j][i].R_c, Rd0));
-                    current_state.cells[j][i].W = vector_add(current_state.cells[j][i].W, dW) ;
+                    double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
+                                                current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                    const std::vector<double>& Rd0 = current_state.R_d0[j-2][i];
+                    std::vector<double> dW = vector_scale(-a1 * dt / current_state.OMEGA[j][i], vector_subtract(current_state.R_c[j-2][i], Rd0));
+                    current_state.W[j][i] = vector_add(current_state.W[j][i], dW) ;
                 }
             }
             current_state.run_odd();
@@ -250,10 +258,11 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
             // Stage 2
             for (int j = 2; j < ny - 2; ++j) {
                 for (int i = 0; i < nx; ++i) {
-                    double dt = compute_dt(current_state.cells[j][i]);
-                    const std::vector<double>& Rd0 = current_state.cells[j][i].R_d0;
-                    std::vector<double> dW = vector_scale(-a2 * dt / current_state.cells[j][i].OMEGA, vector_subtract(current_state.cells[j][i].R_c, Rd0));
-                    current_state.cells[j][i].W = vector_add(current_state.cells[j][i].W, dW) ;
+                    double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
+                                                current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                    const std::vector<double>& Rd0 = current_state.R_d0[j-2][i];
+                    std::vector<double> dW = vector_scale(-a2 * dt / current_state.OMEGA[j][i], vector_subtract(current_state.R_c[j-2][i], Rd0));
+                    current_state.W[j][i] = vector_add(current_state.W[j][i], dW) ;
                 }
             }
             current_state.run_even();
@@ -261,11 +270,12 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
             // Stage 3
             for (int j = 2; j < ny - 2; ++j) {
                 for (int i = 0; i < nx; ++i) {
-                    double dt = compute_dt(current_state.cells[j][i]);
-                    const std::vector<double> Rd20 = vector_add(vector_scale(b3, current_state.cells[j][i].R_d), vector_scale(1-b3, current_state.cells[j][i].R_d0));
-                    current_state.cells[j][i].R_d0 = Rd20;
-                    std::vector<double> dW = vector_scale(-a3 * dt / current_state.cells[j][i].OMEGA,vector_subtract(current_state.cells[j][i].R_c, Rd20));
-                    current_state.cells[j][i].W = vector_add(current_state.cells[j][i].W, dW) ;
+                    double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
+                                                current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                    const std::vector<double> Rd20 = vector_add(vector_scale(b3, current_state.R_d[j-2][i]), vector_scale(1-b3, current_state.R_d0[j-2][i]));
+                    current_state.R_d0[j-2][i] = Rd20;
+                    std::vector<double> dW = vector_scale(-a3 * dt / current_state.OMEGA[j][i], vector_subtract(current_state.R_c[j-2][i], Rd20));
+                    current_state.W[j][i] = vector_add(current_state.W[j][i], dW) ;
                 }
             }
             current_state.run_odd();
@@ -273,10 +283,11 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
             // Stage 4
             for (int j = 2; j < ny - 2; ++j) {
                 for (int i = 0; i < nx; ++i) {
-                    double dt = compute_dt(current_state.cells[j][i]);
-                    const std::vector<double>& Rd20 = current_state.cells[j][i].R_d0;
-                    std::vector<double> dW = vector_scale(-a4 * dt / current_state.cells[j][i].OMEGA, vector_subtract(current_state.cells[j][i].R_c, Rd20));
-                    current_state.cells[j][i].W = vector_add(current_state.cells[j][i].W, dW) ;
+                    double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
+                                                current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                    const std::vector<double>& Rd20 = current_state.R_d0[j-2][i];
+                    std::vector<double> dW = vector_scale(-a4 * dt / current_state.OMEGA[j][i], vector_subtract(current_state.R_c[j-2][i], Rd20));
+                    current_state.W[j][i] = vector_add(current_state.W[j][i], dW) ;
                 }
             }
             current_state.run_even();
@@ -284,19 +295,17 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
             // Stage 5, Final update
             for (int j = 2; j < ny - 2; ++j) {
                 for (int i = 0; i < nx; ++i) {
-                    double dt = compute_dt(current_state.cells[j][i]);
-                    const std::vector<double> Rd42 = vector_add(vector_scale(b5, current_state.cells[j][i].R_d), vector_scale(1-b5, current_state.cells[j][i].R_d0));
-                    current_state.cells[j][i].R_d0 = Rd42;
-                    std::vector<double> Res = vector_subtract(current_state.cells[j][i].R_c, Rd42);
-                    std::vector<double> dW = vector_scale(-a5 * dt / current_state.cells[j][i].OMEGA, Res);
-                    current_state.cells[j][i].W = vector_add(current_state.cells[j][i].W, dW) ;
+                    double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
+                                                current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                    const std::vector<double> Rd42 = vector_add(vector_scale(b5, current_state.R_d[j-2][i]), vector_scale(1-b5, current_state.R_d0[j-2][i]));
+                    current_state.R_d0[j-2][i] = Rd42;
+                    std::vector<double> Res = vector_subtract(current_state.R_c[j-2][i], Rd42);
+                    std::vector<double> dW = vector_scale(-a5 * dt / current_state.OMEGA[j][i], Res);
+                    current_state.W[j][i] = vector_add(current_state.W[j][i], dW) ;
 
                     all_Res[j - 2][i] = Res;
                     all_dw[j - 2][i] = dW;
-                    q[j - 2][i][0] = current_state.cells[j][i].W[0];
-                    q[j - 2][i][1] = current_state.cells[j][i].W[1];
-                    q[j - 2][i][2] = current_state.cells[j][i].W[2];
-                    q[j - 2][i][3] = current_state.cells[j][i].W[3];
+                    q[j - 2][i] = current_state.W[j][i];
                 }
             }
             current_state.run_odd();
@@ -341,10 +350,7 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
         // Compute q_vertex
         for (int j = 1; j < ny - 1; ++j) {
             for (int i = 0; i < nx; ++i) {
-                q_cell_dummy[j - 1][i][0] = current_state.cells[j][i].W[0];
-                q_cell_dummy[j - 1][i][1] = current_state.cells[j][i].W[1];
-                q_cell_dummy[j - 1][i][2] = current_state.cells[j][i].W[2];
-                q_cell_dummy[j - 1][i][3] = current_state.cells[j][i].W[3];
+                q_cell_dummy[j - 1][i] = current_state.W[j][i];
             }
         }
         std::vector<std::vector<std::vector<double>>> q_vertex = cell_dummy_to_vertex_centered_airfoil(q_cell_dummy);

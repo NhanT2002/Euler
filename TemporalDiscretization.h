@@ -30,7 +30,17 @@ public:
                            const double& T_ref,
                            const double& U_ref);
 
-    double compute_dt(const cell& cell_IJ, double sigma=0.5) const;
+    double compute_dt(const std::vector<double>& W_IJ,
+                      const double& OMEGA,
+                      const std::vector<double>& n1,
+                      const std::vector<double>& n2,
+                      const std::vector<double>& n3,
+                      const std::vector<double>& n4,
+                      const double& Ds1,
+                      const double& Ds2,
+                      const double& Ds3,
+                      const double& Ds4,
+                      double sigma=0.25) const;
 
     static std::vector<double> compute_L2_norm(const std::vector<std::vector<std::vector<double>>> &residuals);
 

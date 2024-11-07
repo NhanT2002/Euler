@@ -50,8 +50,8 @@ SpatialDiscretization::SpatialDiscretization(const std::vector<std::vector<doubl
     R_c.resize(ny - 1, std::vector(nx - 1, std::vector<double>(4)));
     R_d.resize(ny - 1, std::vector(nx - 1, std::vector<double>(4)));
     R_d0.resize(ny - 1, std::vector(nx - 1, std::vector<double>(4)));
-    flux.resize(ny - 1 + 4, std::vector(nx - 1, std::vector(2, std::vector<double>(2))));
-    D.resize(ny - 1 + 4, std::vector(nx - 1, std::vector(2, std::vector<double>(2))));
+    flux.resize(ny - 1 + 4, std::vector(nx - 1, std::vector(2, std::vector<double>(4))));
+    D.resize(ny - 1 + 4, std::vector(nx - 1, std::vector(2, std::vector<double>(4))));
     eps_2.resize(ny - 1 + 4, std::vector(nx - 1,std::vector<double>(2)));
     eps_4.resize(ny - 1 + 4, std::vector(nx - 1,std::vector<double>(2)));
     Lambda_I.resize(ny - 1 + 4, std::vector<double>(nx - 1));

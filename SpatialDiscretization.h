@@ -29,11 +29,6 @@ public:
     double T_ref, U_ref;
     int ny, nx;
 
-    std::vector<std::vector<cell>> domain_cells;
-    std::vector<std::vector<cell>> solid_wall_cells;
-    std::vector<std::vector<cell>> farfield_cells;
-    std::vector<std::vector<cell>> cells;
-
     SpatialDiscretization(const std::vector<std::vector<double>>& x,
                           const std::vector<std::vector<double>>& y,
                           const double& rho,
