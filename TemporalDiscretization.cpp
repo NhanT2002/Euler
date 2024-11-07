@@ -10,6 +10,44 @@
 #include <iomanip>
 #include <cmath>
 
+// https://en.wikipedia.org/wiki/Tridiagonal_matrix_algorithm
+std::vector<std::vector<double>> thomasAlgorithm(const std::vector<double>& a, // subdiagonal
+                                                 const std::vector<double>& b, // main diagonal
+                                                 const std::vector<double>& c, // superdiagonal
+                                                 const std::vector<std::vector<double>>& d) {  // right hand side
+    int n = b.size();
+    int numRHS = d[0].size();
+
+    // Initialize modified vectors
+    std::vector<double> cp(n, 0.0);                          // Modified super-diagonal
+    std::vector<std::vector<double>> dp(n, std::vector<double>(numRHS, 0.0));  // Modified right-hand side
+    std::vector<std::vector<double>> x(n, std::vector<double>(numRHS, 0.0));   // Solution vector
+
+    // Forward elimination for each right-hand side
+    cp[0] = c[0] / b[0];
+    for (int j = 0; j < numRHS; j++) {
+        dp[0][j] = d[0][j] / b[0];
+    }
+
+    for (int i = 1; i < n; i++) {
+        double m = b[i] - a[i] * cp[i - 1];
+        cp[i] = c[i] / m;
+        for (int j = 0; j < numRHS; j++) {
+            dp[i][j] = (d[i][j] - a[i] * dp[i-1][j]) / m;
+        }
+    }
+
+    // Back substitution for each right-hand side
+    for (int j = 0; j < numRHS; j++) {
+        x[n-1][j] = dp[n-1][j];
+        for (int i = n - 2; i >= 0; i--) {
+            x[i][j] = dp[i][j] - cp[i] * x[i+1][j];
+        }
+    }
+
+    return x;
+}
+
 TemporalDiscretization::TemporalDiscretization(const std::vector<std::vector<double>>& x,
                                                const std::vector<std::vector<double>>& y,
                                                const double& rho,
@@ -51,8 +89,41 @@ double TemporalDiscretization::compute_dt(const std::vector<double>& W_IJ,
     // Compute time step
     const double dt = sigma * OMEGA / (lambda_I + lambda_J);
     // std::cout << dt << std::endl;
-
     return dt;
+}
+
+std::tuple<double, double> TemporalDiscretization::compute_eps(const std::vector<double>& W_IJ,
+                                          const double& OMEGA,
+                                          const std::vector<double>& n1,
+                                          const std::vector<double>& n2,
+                                          const std::vector<double>& n3,
+                                          const std::vector<double>& n4,
+                                          const double& Ds1,
+                                          const double& Ds2,
+                                          const double& Ds3,
+                                          const double& Ds4,
+                                          const double psi,
+                                          const double rr) const {
+    // Extract conservative variables from the cell
+    auto [rho_IJ, u_IJ, v_IJ, E_IJ, T_IJ, p_IJ] = current_state.SpatialDiscretization::conservative_variable_from_W(W_IJ);
+    double c_IJ = std::sqrt(1.4 * 287 * T_IJ * T_ref)/U_ref;  // Speed of sound
+
+    // Calculate normal vectors and Ds
+    const std::vector<double> n_I = vector_scale(0.5, vector_subtract(n2, n4));
+    const std::vector<double> n_J = vector_scale(0.5, vector_subtract(n1, n3));
+    double Ds_I = 0.5 * (Ds2 + Ds4);
+    double Ds_J = 0.5 * (Ds1 + Ds3);
+
+    // Calculate lambda_I and lambda_J
+    double lambda_I = (std::abs(u_IJ * n_I[0] + v_IJ * n_I[1]) + c_IJ) * Ds_I;
+    double lambda_J = (std::abs(u_IJ * n_J[0] + v_IJ * n_J[1]) + c_IJ) * Ds_J;
+
+
+    double r = lambda_J / lambda_I;
+    double eps_I = std::max(0.25*(std::pow(rr/(1+psi*r), 2)-1), 0.0);
+    double eps_J = std::max(0.25*(std::pow(rr/(1+psi/r), 2)-1), 0.0);
+
+    return std::make_tuple(eps_I, eps_J);
 }
 
 std::vector<double> TemporalDiscretization::compute_L2_norm(const std::vector<std::vector<std::vector<double>>> &residuals) {
@@ -243,7 +314,8 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
         std::vector<double> normalized_residuals = {1, 1, 1, 1};
 
         while (it < it_max) {
-            // Stage 1
+            if (it < 2*nx) {
+                // Stage 1
             for (int j = 2; j < ny - 2; ++j) {
                 for (int i = 0; i < nx; ++i) {
                     double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
@@ -309,6 +381,151 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 }
             }
             current_state.run_odd();
+            }
+            else {
+                std::vector<double> a_I((ny - 4)*nx);
+            std::vector<double> b_I((ny - 4)*nx);
+            std::vector<double> a_J((ny - 4)*nx);
+            std::vector<double> b_J((ny - 4)*nx);
+            std::vector d((ny - 4)*nx, std::vector<double>(4));
+
+            // Stage 1
+            for (int j = 2; j < ny - 2; ++j) {
+                for (int i = 0; i < nx; ++i) {
+                    auto [eps_I, eps_J] = compute_eps(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
+                                                current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                    const std::vector<double>& Rd0 = current_state.R_d0[j-2][i];
+                    std::vector<double> Res = vector_subtract(current_state.R_c[j - 2][i], Rd0);
+                    a_I[(j-2)*nx + i] = -eps_I;
+                    b_I[(j-2)*nx + i] = 1 + 2*eps_I;
+                    a_J[(j-2)*nx + i] = -eps_J;
+                    b_J[(j-2)*nx + i] = 1 + 2*eps_J;
+                    d[(j-2)*nx + i] = Res;
+                }
+            }
+            std::vector<std::vector<double>> R_star = thomasAlgorithm(a_I, b_I, a_I, d);
+            std::vector<std::vector<double>> R_star_star = thomasAlgorithm(a_J, b_J, a_J, R_star);
+            for (int j = 2; j < ny - 2; ++j) {
+                for (int i = 0; i < nx; ++i) {
+                    double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
+                                                current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                    std::vector<double> dW = vector_scale(-a1 * dt / current_state.OMEGA[j][i], R_star_star[(j-2)*nx + i]);
+                    current_state.W[j][i] = vector_add(current_state.W[j][i], dW) ;
+                }
+            }
+            current_state.run_odd();
+
+            // Stage 2
+            for (int j = 2; j < ny - 2; ++j) {
+                for (int i = 0; i < nx; ++i) {
+                    auto [eps_I, eps_J] = compute_eps(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
+                                                current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                    const std::vector<double>& Rd0 = current_state.R_d0[j-2][i];
+                    std::vector<double> Res = vector_subtract(current_state.R_c[j - 2][i], Rd0);
+                    a_I[(j-2)*nx + i] = -eps_I;
+                    b_I[(j-2)*nx + i] = 1 + 2*eps_I;
+                    a_J[(j-2)*nx + i] = -eps_J;
+                    b_J[(j-2)*nx + i] = 1 + 2*eps_J;
+                    d[(j-2)*nx + i] = Res;
+                }
+            }
+            R_star = thomasAlgorithm(a_I, b_I, a_I, d);
+            R_star_star = thomasAlgorithm(a_J, b_J, a_J, R_star);
+            for (int j = 2; j < ny - 2; ++j) {
+                for (int i = 0; i < nx; ++i) {
+                    double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
+                                                current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                    std::vector<double> dW = vector_scale(-a2 * dt / current_state.OMEGA[j][i], R_star_star[(j-2)*nx + i]);
+                    current_state.W[j][i] = vector_add(current_state.W[j][i], dW) ;
+                }
+            }
+            current_state.run_even();
+
+            // Stage 3
+            for (int j = 2; j < ny - 2; ++j) {
+                for (int i = 0; i < nx; ++i) {
+                    auto [eps_I, eps_J] = compute_eps(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
+                                                current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                    const std::vector<double> Rd20 = vector_add(vector_scale(b3, current_state.R_d[j-2][i]), vector_scale(1-b3, current_state.R_d0[j-2][i]));
+                    current_state.R_d0[j-2][i] = Rd20;
+                    std::vector<double> Res = vector_subtract(current_state.R_c[j - 2][i], Rd20);
+                    a_I[(j-2)*nx + i] = -eps_I;
+                    b_I[(j-2)*nx + i] = 1 + 2*eps_I;
+                    a_J[(j-2)*nx + i] = -eps_J;
+                    b_J[(j-2)*nx + i] = 1 + 2*eps_J;
+                    d[(j-2)*nx + i] = Res;
+                }
+            }
+            R_star = thomasAlgorithm(a_I, b_I, a_I, d);
+            R_star_star = thomasAlgorithm(a_J, b_J, a_J, R_star);
+            for (int j = 2; j < ny - 2; ++j) {
+                for (int i = 0; i < nx; ++i) {
+                    double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
+                                                current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                    std::vector<double> dW = vector_scale(-a3 * dt / current_state.OMEGA[j][i], R_star_star[(j-2)*nx + i]);
+                    current_state.W[j][i] = vector_add(current_state.W[j][i], dW) ;
+                }
+            }
+            current_state.run_odd();
+
+            // Stage 4
+            for (int j = 2; j < ny - 2; ++j) {
+                for (int i = 0; i < nx; ++i) {
+                    auto [eps_I, eps_J] = compute_eps(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
+                                                current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                    const std::vector<double>& Rd20 = current_state.R_d0[j-2][i];
+                    std::vector<double> Res = vector_subtract(current_state.R_c[j - 2][i], Rd20);
+                    a_I[(j-2)*nx + i] = -eps_I;
+                    b_I[(j-2)*nx + i] = 1 + 2*eps_I;
+                    a_J[(j-2)*nx + i] = -eps_J;
+                    b_J[(j-2)*nx + i] = 1 + 2*eps_J;
+                    d[(j-2)*nx + i] = Res;
+                }
+            }
+            R_star = thomasAlgorithm(a_I, b_I, a_I, d);
+            R_star_star = thomasAlgorithm(a_J, b_J, a_J, R_star);
+            for (int j = 2; j < ny - 2; ++j) {
+                for (int i = 0; i < nx; ++i) {
+                    double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
+                                                current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                    std::vector<double> dW = vector_scale(-a4 * dt / current_state.OMEGA[j][i], R_star_star[(j-2)*nx + i]);
+                    current_state.W[j][i] = vector_add(current_state.W[j][i], dW) ;
+                }
+            }
+            current_state.run_even();
+
+            // Stage 5, Final update
+            for (int j = 2; j < ny - 2; ++j) {
+                for (int i = 0; i < nx; ++i) {
+                    auto [eps_I, eps_J] = compute_eps(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
+                                                current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                    const std::vector<double> Rd42 = vector_add(vector_scale(b5, current_state.R_d[j-2][i]), vector_scale(1-b5, current_state.R_d0[j-2][i]));
+                    current_state.R_d0[j-2][i] = Rd42;
+                    std::vector<double> Res = vector_subtract(current_state.R_c[j - 2][i], Rd42);
+                    a_I[(j-2)*nx + i] = -eps_I;
+                    b_I[(j-2)*nx + i] = 1 + 2*eps_I;
+                    a_J[(j-2)*nx + i] = -eps_J;
+                    b_J[(j-2)*nx + i] = 1 + 2*eps_J;
+                    d[(j-2)*nx + i] = Res;
+                }
+            }
+            R_star = thomasAlgorithm(a_I, b_I, a_I, d);
+            R_star_star = thomasAlgorithm(a_J, b_J, a_J, R_star);
+            for (int j = 2; j < ny - 2; ++j) {
+                for (int i = 0; i < nx; ++i) {
+                    double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
+                                                current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                    std::vector<double> dW = vector_scale(-a3 * dt / current_state.OMEGA[j][i], R_star_star[(j-2)*nx + i]);
+                    current_state.W[j][i] = vector_add(current_state.W[j][i], dW) ;
+
+                    all_Res[j - 2][i] = R_star_star[(j-2)*nx + i];
+                    all_dw[j - 2][i] = dW;
+                    q[j - 2][i] = current_state.W[j][i];
+                }
+            }
+            current_state.run_odd();
+            }
+
 
 
             // Compute L2 norm (placeholder logic)

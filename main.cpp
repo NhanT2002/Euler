@@ -7,25 +7,47 @@
 #include <tuple>
 #include <cmath>
 
-std::tuple<double, double, double, double, double, double> conservativeVariableFromW(const std::vector<double>& W, const double gamma=1.4) {
-    double variable[4]; // Assuming 4 variables in W
-    for (int i = 0; i < 4; ++i) {
-        variable[i] = W[i] / W[0]; // Normalize W
+std::vector<std::vector<double>> thomasAlgorithm1(const std::vector<double>& a, // subdiagonal
+                                                 const std::vector<double>& b, // main diagonal
+                                                 const std::vector<double>& c, // superdiagonal
+                                                 const std::vector<std::vector<double>>& d) {  // right hand side
+    int n = b.size();
+    int numRHS = d.size();
+
+    // Initialize modified vectors
+    std::vector<double> cp(n, 0.0);                          // Modified super-diagonal
+    std::vector<std::vector<double>> dp(numRHS, std::vector<double>(n, 0.0));  // Modified right-hand side
+    std::vector<std::vector<double>> x(numRHS, std::vector<double>(n, 0.0));   // Solution vector
+
+    // Forward elimination for each right-hand side
+    cp[0] = c[0] / b[0];
+    for (int j = 0; j < numRHS; j++) {
+        dp[j][0] = d[j][0] / b[0];
     }
 
-    double rho = W[0];
-    double u = variable[1];
-    double v = variable[2];
-    double E = variable[3];
-    double p = (gamma - 1) * rho * (E - (u * u + v * v) / 2);
-    double T = p / (rho * 287); // Assume gas constant R = 287
+    for (int i = 1; i < n; i++) {
+        double m = b[i] - a[i] * cp[i - 1];
+        cp[i] = c[i] / m;
+        for (int j = 0; j < numRHS; j++) {
+            dp[j][i] = (d[j][i] - a[i] * dp[j][i - 1]) / m;
+        }
+    }
 
-    return std::make_tuple(rho, u, v, E, T, p);
+    // Back substitution for each right-hand side
+    for (int j = 0; j < numRHS; j++) {
+        x[j][n - 1] = dp[j][n - 1];
+        for (int i = n - 2; i >= 0; i--) {
+            x[j][i] = dp[j][i] - cp[i] * x[j][i + 1];
+        }
+    }
+
+    return x;
 }
 
 int main() {
+
     // Read the PLOT3D mesh from a file
-    auto [x, y] = read_PLOT3D_mesh("../mesh/x.6");
+    auto [x, y] = read_PLOT3D_mesh("../mesh/x.9");
 
     // Output the dimensions and some values for verification
     std::cout << "Grid dimensions: " << x.size() << " x " << x[0].size() << std::endl;

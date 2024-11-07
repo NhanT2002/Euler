@@ -42,6 +42,19 @@ public:
                       const double& Ds4,
                       double sigma=0.25) const;
 
+    std::tuple<double, double> compute_eps(const std::vector<double>& W_IJ,
+                  const double& OMEGA,
+                  const std::vector<double>& n1,
+                  const std::vector<double>& n2,
+                  const std::vector<double>& n3,
+                  const std::vector<double>& n4,
+                  const double& Ds1,
+                  const double& Ds2,
+                  const double& Ds3,
+                  const double& Ds4,
+                  double psi = 0.125,
+                  double rr = 2) const;
+
     static std::vector<double> compute_L2_norm(const std::vector<std::vector<std::vector<double>>> &residuals);
 
     static void save_checkpoint(const std::vector<std::vector<std::vector<double>>>& q,
