@@ -52,8 +52,9 @@ int main() {
 
     omp_set_num_threads(4); // Set to 4 threads
 
+    auto start = std::chrono::high_resolution_clock::now();
     // Read the PLOT3D mesh from a file
-    auto [x, y] = read_PLOT3D_mesh("../mesh/x.9");
+    auto [x, y] = read_PLOT3D_mesh("../mesh/x.1");
 
     // Output the dimensions and some values for verification
     std::cout << "Grid dimensions: " << x.size() << " x " << x[0].size() << std::endl;
@@ -85,7 +86,11 @@ int main() {
     // current_state.run_even();
 
     TemporalDiscretization FVM(x, y, rho, u, v, E, T, p, T_inf, U_ref);
-    auto[q, q_vertex, Residuals] = FVM.RungeKutta(50000);
+    auto[q, q_vertex, Residuals] = FVM.RungeKutta(100);
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> serialDuration = end - start;
+    std::cout << "\nSolver duration: " << serialDuration.count() << " seconds\n";
 
     TemporalDiscretization::save_checkpoint(q, {static_cast<int>(Residuals.size())}, Residuals, "checkpoint_test.txt");
     write_plot3d_2d(x, y, q_vertex, Mach, alpha, 0, 0, rho_inf, U_ref,"test.xy", "test.q");

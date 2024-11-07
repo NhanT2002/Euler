@@ -62,6 +62,17 @@ SpatialDiscretization::SpatialDiscretization(const std::vector<std::vector<doubl
     #pragma omp parallel for
     for (size_t j = 0; j < ny - 1 ; ++j) {
         for (size_t i = 0; i < nx - 1; ++i) {
+            // int thread_num = omp_get_thread_num();
+            //
+            // // Print thread number and the current index (iteration of the loop)
+            // std::cout << "Thread " << thread_num << " processing index " << i << std::endl;
+            //
+            // int num_threads = omp_get_num_threads();
+            // // Print the number of threads used and the current thread number
+            // if (i == 0) {
+            //     // Print the number of threads only once (at the first iteration)
+            //     std::cout << "Number of threads: " << num_threads << std::endl;
+            // }
             const double& x1 = x[j][i];
             const double& x2 = x[j][i+1];
             const double& x3 = x[j+1][i+1];
