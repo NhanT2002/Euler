@@ -40,7 +40,7 @@ public:
                       const double& Ds2,
                       const double& Ds3,
                       const double& Ds4,
-                      double sigma=0.25) const;
+                      double sigma=0.6) const;
 
     std::tuple<double, double> compute_eps(const std::vector<double>& W_IJ,
                   const double& OMEGA,
