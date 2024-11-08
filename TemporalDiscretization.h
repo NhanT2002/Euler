@@ -53,7 +53,7 @@ public:
                   const double& Ds3,
                   const double& Ds4,
                   double psi = 0.125,
-                  double rr = 2) const;
+                  double rr = 1.) const;
 
     static std::vector<double> compute_L2_norm(const std::vector<std::vector<std::vector<double>>> &residuals);
 

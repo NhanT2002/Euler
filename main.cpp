@@ -50,11 +50,11 @@ long long parallelSumOfSquares(const std::vector<int>& data, int numThreads) {
 
 int main() {
 
-    omp_set_num_threads(4); // Set to 4 threads
+    omp_set_num_threads(16); // Set number of threads
 
     auto start = std::chrono::high_resolution_clock::now();
     // Read the PLOT3D mesh from a file
-    auto [x, y] = read_PLOT3D_mesh("../mesh/x.1");
+    auto [x, y] = read_PLOT3D_mesh("../mesh/x.6");
 
     // Output the dimensions and some values for verification
     std::cout << "Grid dimensions: " << x.size() << " x " << x[0].size() << std::endl;
@@ -86,7 +86,7 @@ int main() {
     // current_state.run_even();
 
     TemporalDiscretization FVM(x, y, rho, u, v, E, T, p, T_inf, U_ref);
-    auto[q, q_vertex, Residuals] = FVM.RungeKutta(100);
+    auto[q, q_vertex, Residuals] = FVM.RungeKutta(50000);
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> serialDuration = end - start;

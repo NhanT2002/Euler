@@ -77,8 +77,8 @@ double TemporalDiscretization::compute_dt(const std::vector<double>& W_IJ,
     double c_IJ = std::sqrt(1.4 * 287 * T_IJ * T_ref)/U_ref;  // Speed of sound
 
     // Calculate normal vectors and Ds
-    const std::vector<double> n_I = vector_scale(0.5, vector_subtract(n2, n4));
-    const std::vector<double> n_J = vector_scale(0.5, vector_subtract(n1, n3));
+    const std::vector<double> n_I = vector_scale(0.5, vector_add(n2, n4));
+    const std::vector<double> n_J = vector_scale(0.5, vector_add(n1, n3));
     double Ds_I = 0.5 * (Ds2 + Ds4);
     double Ds_J = 0.5 * (Ds1 + Ds3);
 
@@ -109,8 +109,8 @@ std::tuple<double, double> TemporalDiscretization::compute_eps(const std::vector
     double c_IJ = std::sqrt(1.4 * 287 * T_IJ * T_ref)/U_ref;  // Speed of sound
 
     // Calculate normal vectors and Ds
-    const std::vector<double> n_I = vector_scale(0.5, vector_subtract(n2, n4));
-    const std::vector<double> n_J = vector_scale(0.5, vector_subtract(n1, n3));
+    const std::vector<double> n_I = vector_scale(0.5, vector_add(n2, n4));
+    const std::vector<double> n_J = vector_scale(0.5, vector_add(n1, n3));
     double Ds_I = 0.5 * (Ds2 + Ds4);
     double Ds_J = 0.5 * (Ds1 + Ds3);
 
