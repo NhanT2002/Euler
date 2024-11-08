@@ -1,5 +1,4 @@
 #include  "read_PLOT3D.h"
-#include "cell.h"
 #include "SpatialDiscretization.h"
 #include "TemporalDiscretization.h"
 #include <iostream>
@@ -59,7 +58,7 @@ int main() {
     // Output the dimensions and some values for verification
     std::cout << "Grid dimensions: " << x.size() << " x " << x[0].size() << std::endl;
 
-    constexpr double Mach = 0.8;
+    constexpr double Mach = 0.5;
     constexpr double alpha = 1.25*M_PI/180;
     constexpr double p_inf = 1E5;
     constexpr double T_inf = 215.0;

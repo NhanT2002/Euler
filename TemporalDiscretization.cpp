@@ -9,6 +9,7 @@
 #include <string>
 #include <iomanip>
 #include <cmath>
+#include <omp.h>
 
 // https://en.wikipedia.org/wiki/Tridiagonal_matrix_algorithm
 std::vector<std::vector<double>> thomasAlgorithm(const std::vector<double>& a, // subdiagonal

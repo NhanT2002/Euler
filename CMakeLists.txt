@@ -10,8 +10,6 @@ find_package(OpenMP)
 add_executable(Euler main.cpp
         read_PLOT3D.h
         read_PLOT3D.cpp
-        cell.cpp
-        cell.h
         SpatialDiscretization.cpp
         SpatialDiscretization.h
         vector_helper.h

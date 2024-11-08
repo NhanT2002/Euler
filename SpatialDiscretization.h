@@ -1,7 +1,6 @@
 #ifndef SPATIALDISCRETIZATION_H
 #define SPATIALDISCRETIZATION_H
 
-#include "cell.h"
 #include <vector>
 
 class SpatialDiscretization {
