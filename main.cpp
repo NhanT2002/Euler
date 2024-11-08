@@ -65,8 +65,8 @@ int main() {
     std::chrono::duration<double> serialDuration = end - start;
     std::cout << "\nSolver duration: " << serialDuration.count() << " seconds\n";
 
-    TemporalDiscretization::save_checkpoint(q, {static_cast<int>(Residuals.size())}, Residuals, "checkpoint_test.txt");
-    write_plot3d_2d(x, y, q_vertex, Mach, alpha, 0, 0, rho_inf, U_ref,"test.xy", "test.q");
+    TemporalDiscretization::save_checkpoint(q, {static_cast<int>(Residuals.size())}, Residuals, "checkpoint_test_old.txt");
+    write_plot3d_2d(x, y, q_vertex, Mach, alpha, 0, 0, rho_inf, U_ref,"test_old.xy", "test_old.q");
     std::cout << "PLOT3D files written successfully." << std::endl;
 
 
