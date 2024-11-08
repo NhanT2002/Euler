@@ -50,7 +50,7 @@ public:
     void compute_Fc_DeltaS();
     std::tuple<double, double> compute_epsilon(const std::vector<double>& W_Im1, const std::vector<double>& W_I,
                                               const std::vector<double>& W_Ip1, const std::vector<double>& W_Ip2,
-                                              double k2 = 0.5, double k4 = 1.0/32.0) const;
+                                              double k2 = 0.5, double k4 = 1.0/64.0) const;
 
     void compute_dissipation();
 

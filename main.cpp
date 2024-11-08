@@ -53,12 +53,12 @@ int main() {
 
     auto start = std::chrono::high_resolution_clock::now();
     // Read the PLOT3D mesh from a file
-    auto [x, y] = read_PLOT3D_mesh("../mesh/x.8");
+    auto [x, y] = read_PLOT3D_mesh("../mesh/x.9");
 
     // Output the dimensions and some values for verification
     std::cout << "Grid dimensions: " << x.size() << " x " << x[0].size() << std::endl;
 
-    constexpr double Mach = 0.5;
+    constexpr double Mach = 0.8;
     constexpr double alpha = 1.25*M_PI/180;
     constexpr double p_inf = 1E5;
     constexpr double T_inf = 215.0;
