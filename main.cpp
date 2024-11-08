@@ -6,6 +6,7 @@
 #include <vector>
 #include <tuple>
 #include <cmath>
+#include <chrono>
 
 std::tuple<double, double, double, double, double, double> conservativeVariableFromW(const std::vector<double>& W, const double gamma=1.4) {
     double variable[4]; // Assuming 4 variables in W
@@ -24,8 +25,9 @@ std::tuple<double, double, double, double, double, double> conservativeVariableF
 }
 
 int main() {
+    auto start = std::chrono::high_resolution_clock::now();
     // Read the PLOT3D mesh from a file
-    auto [x, y] = read_PLOT3D_mesh("../mesh/x.9");
+    auto [x, y] = read_PLOT3D_mesh("../mesh/x.8");
 
     // Output the dimensions and some values for verification
     std::cout << "Grid dimensions: " << x.size() << " x " << x[0].size() << std::endl;
@@ -52,16 +54,19 @@ int main() {
     constexpr double T = 1.0;
     constexpr double p = 1.0;
 
-    SpatialDiscretization current_state(x, y, rho, u, v, E, T, p, T_inf, U_ref);
-    current_state.run_even();
-    std::vector<std::vector<cell>> cells = current_state.cells;
-    cell cell_test = cells[2][2];
+    // // SpatialDiscretization current_state(x, y, rho, u, v, E, T, p, T_inf, U_ref);
+    // SpatialDiscretization current_state(x, y, rho_inf, u_inf, v_inf, E_inf, T_inf, p_inf, 1, 1);
+    // current_state.run_even();
 
     TemporalDiscretization FVM(x, y, rho, u, v, E, T, p, T_inf, U_ref);
     auto[q, q_vertex, Residuals] = FVM.RungeKutta(50000);
 
-    TemporalDiscretization::save_checkpoint(q, {static_cast<int>(Residuals.size())}, Residuals, "checkpoint_test_M05_alpha125_x6_4.txt");
-    write_plot3d_2d(x, y, q_vertex, Mach, alpha, 0, 0, rho_inf, U_ref,"test_M05_alpha125_x6_4.xy", "test_M05_alpha125_x6_4.q");
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> serialDuration = end - start;
+    std::cout << "\nSolver duration: " << serialDuration.count() << " seconds\n";
+
+    TemporalDiscretization::save_checkpoint(q, {static_cast<int>(Residuals.size())}, Residuals, "checkpoint_test.txt");
+    write_plot3d_2d(x, y, q_vertex, Mach, alpha, 0, 0, rho_inf, U_ref,"test.xy", "test.q");
     std::cout << "PLOT3D files written successfully." << std::endl;
 
 
