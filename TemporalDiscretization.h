@@ -40,7 +40,7 @@ public:
                       const double& Ds2,
                       const double& Ds3,
                       const double& Ds4,
-                      double sigma=0.5) const;
+                      double sigma=0.4) const;
 
     std::tuple<double, double> compute_eps(const std::vector<double>& W_IJ,
                   const double& OMEGA,
@@ -53,7 +53,7 @@ public:
                   const double& Ds3,
                   const double& Ds4,
                   double psi = 0.125,
-                  double rr = 1.) const;
+                  double rr = 2.0) const;
 
     static std::vector<double> compute_L2_norm(const std::vector<std::vector<std::vector<double>>> &residuals);
 

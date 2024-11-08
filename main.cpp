@@ -53,7 +53,7 @@ int main() {
 
     auto start = std::chrono::high_resolution_clock::now();
     // Read the PLOT3D mesh from a file
-    auto [x, y] = read_PLOT3D_mesh("../mesh/x.6");
+    auto [x, y] = read_PLOT3D_mesh("../mesh/x.8");
 
     // Output the dimensions and some values for verification
     std::cout << "Grid dimensions: " << x.size() << " x " << x[0].size() << std::endl;
