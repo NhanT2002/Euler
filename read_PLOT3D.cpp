@@ -117,33 +117,11 @@ void write_plot3d_2d(
     double time,
     double rho_ref,
     double U_ref,
-    const std::string& grid_filename,
     const std::string& solution_filename)
 {
     // Get dimensions
     auto nj = x.size();
     auto ni = x[0].size();
-
-    // Write grid file (2D.xy)
-    std::ofstream grid_file(grid_filename);
-    if (!grid_file) {
-        throw std::runtime_error("Could not open grid file: " + grid_filename);
-    }
-
-    grid_file << ni << " " << nj << "\n";  // Grid dimensions
-    // Write x-coordinates (reverse the order: i first, then j)
-    for (int j = 0; j < nj; ++j) {
-        for (int i = 0; i < ni; ++i) {
-            grid_file << std::scientific << std::setprecision(16) << x[j][i] << "\n";
-        }
-    }
-    // Write y-coordinates (reverse the order: i first, then j)
-    for (int j = 0; j < nj; ++j) {
-        for (int i = 0; i < ni; ++i) {
-            grid_file << std::scientific << std::setprecision(16) << y[j][i] << "\n";
-        }
-    }
-    grid_file.close();  // Close the grid file
 
     // Write solution file (2D.q)
     std::ofstream solution_file(solution_filename);

@@ -49,22 +49,24 @@ long long parallelSumOfSquares(const std::vector<int>& data, int numThreads) {
 
 int main() {
 
-    omp_set_num_threads(16); // Set number of threads
+    // omp_set_num_threads(24); // Set number of threads
+    int max_threads = omp_get_max_threads();
+    std::cout << "Maximum available threads: " << max_threads << std::endl;
 
     auto start = std::chrono::high_resolution_clock::now();
     // Read the PLOT3D mesh from a file
-    auto [x, y] = read_PLOT3D_mesh("../mesh/x.9");
+    auto [x, y] = read_PLOT3D_mesh("../mesh/x.6");
 
     // Output the dimensions and some values for verification
     std::cout << "Grid dimensions: " << x.size() << " x " << x[0].size() << std::endl;
 
-    constexpr double Mach = 0.8;
+    constexpr double Mach = 0.5;
     constexpr double alpha = 1.25*M_PI/180;
     constexpr double p_inf = 1E5;
-    constexpr double T_inf = 215.0;
+    constexpr double T_inf = 300.0;
     constexpr double rho_inf = p_inf/(T_inf*287);
 
-    constexpr double a = std::sqrt(1.4*287*T_inf);
+    constexpr double a = std::sqrt(1.4*p_inf/rho_inf);
     constexpr double Vitesse = Mach*a;
     constexpr double u_inf = Vitesse*std::cos(alpha);
     constexpr double v_inf = Vitesse*std::sin(alpha);
@@ -80,21 +82,21 @@ int main() {
     constexpr double T = 1.0;
     constexpr double p = 1.0;
 
-    // // SpatialDiscretization current_state(x, y, rho, u, v, E, T, p, T_inf, U_ref);
-    // SpatialDiscretization current_state(x, y, rho_inf, u_inf, v_inf, E_inf, T_inf, p_inf, 1, 1);
+    // SpatialDiscretization current_state(x, y, rho, u, v, E, T, p, T_inf, U_ref);
+    // // SpatialDiscretization current_state(x, y, rho_inf, u_inf, v_inf, E_inf, T_inf, p_inf, 1, 1);
     // current_state.run_even();
 
-    TemporalDiscretization FVM(x, y, rho, u, v, E, T, p, T_inf, U_ref);
-    auto[q, q_vertex, Residuals] = FVM.RungeKutta(50000);
+    TemporalDiscretization FVM(x, y, rho, u, v, E, T, p, T_inf, U_ref, 7.5, 1);
+    // TemporalDiscretization FVM(x, y, rho_inf, u_inf, v_inf, E_inf, T_inf, p_inf, 1, 1);
+    auto[q, q_vertex, Residuals] = FVM.RungeKutta(500);
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> serialDuration = end - start;
     std::cout << "\nSolver duration: " << serialDuration.count() << " seconds\n";
 
     TemporalDiscretization::save_checkpoint(q, {static_cast<int>(Residuals.size())}, Residuals, "checkpoint_test.txt");
-    write_plot3d_2d(x, y, q_vertex, Mach, alpha, 0, 0, rho_inf, U_ref,"test.xy", "test.q");
+    write_plot3d_2d(x, y, q_vertex, Mach, alpha, 0, 0, rho_inf, U_ref, "test.q");
     std::cout << "PLOT3D files written successfully." << std::endl;
-
 
     return 0;
 

@@ -24,9 +24,10 @@ public:
     std::vector<std::vector<std::vector<double>>> Lambda_S;
 
     std::vector<std::vector<double>> x, y;
-    double rho, u, v, E, T, p;
-    double T_ref, U_ref;
+    const double rho, u, v, E, T, p;
+    const double T_ref, U_ref;
     int ny, nx;
+    double alpha;
 
     SpatialDiscretization(const std::vector<std::vector<double>>& x,
                           const std::vector<std::vector<double>>& y,
@@ -50,7 +51,9 @@ public:
     void compute_Fc_DeltaS();
     std::tuple<double, double> compute_epsilon(const std::vector<double>& W_Im1, const std::vector<double>& W_I,
                                               const std::vector<double>& W_Ip1, const std::vector<double>& W_Ip2,
-                                              double k2 = 0.5, double k4 = 1.0/64.0) const;
+                                              double k2 = 0.5, double k4 = 1.0/32.0) const;
+
+    void compute_lambda();
 
     void compute_dissipation();
 

@@ -12,12 +12,15 @@
 #include <omp.h>
 
 // https://en.wikipedia.org/wiki/Tridiagonal_matrix_algorithm
-std::vector<std::vector<double>> thomasAlgorithm(const std::vector<double>& a, // subdiagonal
+std::vector<std::vector<double>> thomasAlgorithm(std::vector<double>& a, // subdiagonal
                                                  const std::vector<double>& b, // main diagonal
-                                                 const std::vector<double>& c, // superdiagonal
+                                                 std::vector<double>& c, // superdiagonal
                                                  const std::vector<std::vector<double>>& d) {  // right hand side
     int n = b.size();
     int numRHS = d[0].size();
+
+    // a[0] = 0.0;
+    // c[n-1] = 0.0;
 
     // Initialize modified vectors
     std::vector<double> cp(n, 0.0);                          // Modified super-diagonal
@@ -49,6 +52,32 @@ std::vector<std::vector<double>> thomasAlgorithm(const std::vector<double>& a, /
     return x;
 }
 
+std::vector<std::vector<double>> reshapeColumnWise(
+    const std::vector<std::vector<double>>& input,
+    int ny, int nx)
+{
+    // Check input dimensions
+    if (input.size() != ny * nx) {
+        throw std::invalid_argument("Input size does not match ny * nx.");
+    }
+
+    int depth = input[0].size(); // Assuming 4 in this case (nx * ny, 4)
+
+    // Initialize reshaped array
+    std::vector<std::vector<double>> reshaped(ny * nx, std::vector<double>(depth));
+
+    // Perform column-wise reshaping
+    for (int d = 0; d < depth; ++d) {
+        for (int i = 0; i < ny; ++i) {
+            for (int j = 0; j < nx; ++j) {
+                reshaped[i * nx + j][d] = input[j * ny + i][d];
+            }
+        }
+    }
+
+    return reshaped;
+}
+
 TemporalDiscretization::TemporalDiscretization(const std::vector<std::vector<double>>& x,
                                                const std::vector<std::vector<double>>& y,
                                                const double& rho,
@@ -58,74 +87,89 @@ TemporalDiscretization::TemporalDiscretization(const std::vector<std::vector<dou
                                                const double& T,
                                                const double& p,
                                                const double& T_ref,
-                                               const double& U_ref)
-    : x(x), y(y), rho(rho), u(u), v(v), E(E), T(T), p(p), T_ref(T_ref), U_ref(U_ref),
+                                               const double& U_ref,
+                                               const double sigma,
+                                               const int res_smoothing)
+    : x(x), y(y), rho(rho), u(u), v(v), E(E), T(T), p(p), T_ref(T_ref), U_ref(U_ref), sigma(sigma), res_smoothing(res_smoothing),
       current_state(x, y, rho, u, v, E, T, p, T_ref, U_ref) {}
 
-double TemporalDiscretization::compute_dt(const std::vector<double>& W_IJ,
-                                          const double& OMEGA,
-                                          const std::vector<double>& n1,
-                                          const std::vector<double>& n2,
-                                          const std::vector<double>& n3,
-                                          const std::vector<double>& n4,
-                                          const double& Ds1,
-                                          const double& Ds2,
-                                          const double& Ds3,
-                                          const double& Ds4,
-                                          const double sigma) const {
-    // Extract conservative variables from the cell
-    auto [rho_IJ, u_IJ, v_IJ, E_IJ, T_IJ, p_IJ] = current_state.SpatialDiscretization::conservative_variable_from_W(W_IJ);
-    double c_IJ = std::sqrt(1.4 * 287 * T_IJ * T_ref)/U_ref;  // Speed of sound
+std::vector<std::vector<double>> TemporalDiscretization::compute_dt() const {
+    auto ny = current_state.W.size();
+    auto nx = current_state.W[0].size();
 
-    // Calculate normal vectors and Ds
-    const std::vector<double> n_I = vector_scale(0.5, vector_add(n2, n4));
-    const std::vector<double> n_J = vector_scale(0.5, vector_add(n1, n3));
-    double Ds_I = 0.5 * (Ds2 + Ds4);
-    double Ds_J = 0.5 * (Ds1 + Ds3);
+    std::vector dt(y.size() - 1 + 4, std::vector<double>(x.size() - 1));
 
-    // Calculate lambda_I and lambda_J
-    double lambda_I = (std::abs(u_IJ * n_I[0] + v_IJ * n_I[1]) + c_IJ) * Ds_I;
-    double lambda_J = (std::abs(u_IJ * n_J[0] + v_IJ * n_J[1]) + c_IJ) * Ds_J;
+    #pragma omp parallel for
+    for (int j = 2; j < ny - 2; ++j) {
+        for (int i = 0; i < nx; ++i) {
+            dt[j][i] = sigma*current_state.OMEGA[j][i]/(current_state.Lambda_I[j][i]+current_state.Lambda_J[j][i]);
 
-    // Compute time step
-    const double dt = sigma * OMEGA / (lambda_I + lambda_J);
-    // std::cout << dt << std::endl;
+        }
+    }
+
     return dt;
 }
+std::tuple<std::vector<double>, std::vector<double>, std::vector<double>, std::vector<double>, std::vector<double>, std::vector<double>> TemporalDiscretization::compute_abc() const {
+    auto ny = current_state.W.size();
+    auto nx = current_state.W[0].size();
 
-std::tuple<double, double> TemporalDiscretization::compute_eps(const std::vector<double>& W_IJ,
-                                          const double& OMEGA,
-                                          const std::vector<double>& n1,
-                                          const std::vector<double>& n2,
-                                          const std::vector<double>& n3,
-                                          const std::vector<double>& n4,
-                                          const double& Ds1,
-                                          const double& Ds2,
-                                          const double& Ds3,
-                                          const double& Ds4,
-                                          const double psi,
-                                          const double rr) const {
-    // Extract conservative variables from the cell
-    auto [rho_IJ, u_IJ, v_IJ, E_IJ, T_IJ, p_IJ] = current_state.SpatialDiscretization::conservative_variable_from_W(W_IJ);
-    double c_IJ = std::sqrt(1.4 * 287 * T_IJ * T_ref)/U_ref;  // Speed of sound
+    std::vector<double> a_I((ny - 4)*nx);
+    std::vector<double> b_I((ny - 4)*nx);
+    std::vector<double> c_I((ny - 4)*nx);
+    std::vector<double> a_J((ny - 4)*nx);
+    std::vector<double> b_J((ny - 4)*nx);
+    std::vector<double> c_J((ny - 4)*nx);
 
-    // Calculate normal vectors and Ds
-    const std::vector<double> n_I = vector_scale(0.5, vector_add(n2, n4));
-    const std::vector<double> n_J = vector_scale(0.5, vector_add(n1, n3));
-    double Ds_I = 0.5 * (Ds2 + Ds4);
-    double Ds_J = 0.5 * (Ds1 + Ds3);
+    double rr = 2;
+    #pragma omp parallel for
+    for (int j = 2; j < ny - 2; ++j) {
+        for (int i = 0; i < nx; ++i) {
+            double r = current_state.Lambda_J[j][i]/current_state.Lambda_I[j][i];
+            double eps_I = std::max(0.25*(std::pow(rr*(1 + std::sqrt(r))/(1+r), 2)-1), 0.0);
 
-    // Calculate lambda_I and lambda_J
-    double lambda_I = (std::abs(u_IJ * n_I[0] + v_IJ * n_I[1]) + c_IJ) * Ds_I;
-    double lambda_J = (std::abs(u_IJ * n_J[0] + v_IJ * n_J[1]) + c_IJ) * Ds_J;
+            if (i == 0) {
+                a_I[(j-2)*nx + i] = 0.0;
+            }
+            else {
+                a_I[(j-2)*nx + i] = -eps_I;
+            }
+            if (i == nx - 1) {
+                c_I[(j-2)*nx + i] = 0.0;
+            }
+            else {
+                c_I[(j-2)*nx + i] = -eps_I;
+            }
 
+            b_I[(j-2)*nx + i] = 1 + 2*eps_I;
+        }
+    }
 
-    double r = lambda_J / lambda_I;
-    double eps_I = std::max(0.25*(std::pow(rr/(1+psi*r), 2)-1), 0.0);
-    double eps_J = std::max(0.25*(std::pow(rr/(1+psi/r), 2)-1), 0.0);
+    #pragma omp parallel for
+    for (int i = 0; i < nx; ++i) {
+        for (int j = 2; j < ny - 2; ++j) {
+            double r = current_state.Lambda_J[j][i]/current_state.Lambda_I[j][i];
+            double eps_J = std::max(0.25*(std::pow(rr*(1 + std::sqrt(1/r))/(1+1/r), 2)-1), 0.0);
 
-    return std::make_tuple(eps_I, eps_J);
+            if (j == 2) {
+                a_J[i*nx + (j-2)] = 0.0;
+            }
+            else {
+                a_J[i*nx + (j-2)] = -eps_J;
+            }
+            if (j == ny - 3) {
+                c_J[i*nx + (j-2)] = 0.0;
+            }
+            else {
+                c_J[i*nx + (j-2)] = -eps_J;
+            }
+            b_J[i*nx + (j-2)] = 1 + 2*eps_J;
+
+        }
+    }
+
+    return std::make_tuple(a_I, b_I, c_I, a_J, b_J, c_J);
 }
+
 
 std::vector<double> TemporalDiscretization::compute_L2_norm(const std::vector<std::vector<std::vector<double>>> &residuals) {
     const auto m = residuals.size();          // Number of rows
@@ -278,8 +322,8 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
     double a4 = 0.5; double b4 = 0.0;
     double a5 = 1.0; double b5 = 0.44;
 
-    auto ny = current_state.W.size();
-    auto nx = current_state.W[0].size();
+    int ny = current_state.W.size();
+    int nx = current_state.W[0].size();
     std::cout << ny << " " << nx << std::endl;
 
     current_state.run_even();
@@ -315,16 +359,18 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
         std::vector<double> normalized_residuals = {1, 1, 1, 1};
 
         while (it < it_max) {
-            if (it < nx) {
+            if (res_smoothing == 0) {
+                auto dt = compute_dt();
+                std::vector<std::vector<std::vector<double>>> W_0 = current_state.W;
                 // Stage 1
                 #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
-                        double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
-                                                    current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                        double dt_loc = dt[j][i];
                         const std::vector<double>& Rd0 = current_state.R_d0[j-2][i];
-                        std::vector<double> dW = vector_scale(-a1 * dt / current_state.OMEGA[j][i], vector_subtract(current_state.R_c[j-2][i], Rd0));
-                        current_state.W[j][i] = vector_add(current_state.W[j][i], dW) ;
+                        std::vector<double> Res = vector_scale(1/current_state.OMEGA[j][i], vector_subtract(current_state.R_c[j - 2][i], Rd0));
+                        std::vector<double> dW = vector_scale(-a1 * dt_loc, Res);
+                        current_state.W[j][i] = vector_add(W_0[j][i], dW);
                     }
                 }
                 current_state.run_odd();
@@ -333,11 +379,11 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
-                        double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
-                                                    current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                        double dt_loc = dt[j][i];
                         const std::vector<double>& Rd0 = current_state.R_d0[j-2][i];
-                        std::vector<double> dW = vector_scale(-a2 * dt / current_state.OMEGA[j][i], vector_subtract(current_state.R_c[j-2][i], Rd0));
-                        current_state.W[j][i] = vector_add(current_state.W[j][i], dW) ;
+                        std::vector<double> Res = vector_scale(1/current_state.OMEGA[j][i], vector_subtract(current_state.R_c[j - 2][i], Rd0));
+                        std::vector<double> dW = vector_scale(-a2 * dt_loc, Res);
+                        current_state.W[j][i] = vector_add(W_0[j][i], dW);
                     }
                 }
                 current_state.run_even();
@@ -346,12 +392,12 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
-                        double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
-                                                    current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                        double dt_loc = dt[j][i];
                         const std::vector<double> Rd20 = vector_add(vector_scale(b3, current_state.R_d[j-2][i]), vector_scale(1-b3, current_state.R_d0[j-2][i]));
                         current_state.R_d0[j-2][i] = Rd20;
-                        std::vector<double> dW = vector_scale(-a3 * dt / current_state.OMEGA[j][i], vector_subtract(current_state.R_c[j-2][i], Rd20));
-                        current_state.W[j][i] = vector_add(current_state.W[j][i], dW) ;
+                        std::vector<double> Res = vector_scale(1/current_state.OMEGA[j][i], vector_subtract(current_state.R_c[j - 2][i], Rd20));
+                        std::vector<double> dW = vector_scale(-a3 * dt_loc, Res);
+                        current_state.W[j][i] = vector_add(W_0[j][i], dW);
                     }
                 }
                 current_state.run_odd();
@@ -360,11 +406,11 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
-                        double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
-                                                    current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                        double dt_loc = dt[j][i];
                         const std::vector<double>& Rd20 = current_state.R_d0[j-2][i];
-                        std::vector<double> dW = vector_scale(-a4 * dt / current_state.OMEGA[j][i], vector_subtract(current_state.R_c[j-2][i], Rd20));
-                        current_state.W[j][i] = vector_add(current_state.W[j][i], dW) ;
+                        std::vector<double> Res = vector_scale(1/current_state.OMEGA[j][i], vector_subtract(current_state.R_c[j - 2][i], Rd20));
+                        std::vector<double> dW = vector_scale(-a4 * dt_loc, Res);
+                        current_state.W[j][i] = vector_add(W_0[j][i], dW);
                     }
                 }
                 current_state.run_even();
@@ -373,52 +419,53 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
-                        double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
-                                                    current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                        double dt_loc = dt[j][i];
                         const std::vector<double> Rd42 = vector_add(vector_scale(b5, current_state.R_d[j-2][i]), vector_scale(1-b5, current_state.R_d0[j-2][i]));
                         current_state.R_d0[j-2][i] = Rd42;
                         std::vector<double> Res = vector_subtract(current_state.R_c[j-2][i], Rd42);
-                        std::vector<double> dW = vector_scale(-a5 * dt / current_state.OMEGA[j][i], Res);
-                        current_state.W[j][i] = vector_add(current_state.W[j][i], dW) ;
+                        std::vector<double> dW = vector_scale(-a5 * dt_loc / current_state.OMEGA[j][i], Res);
+                        current_state.W[j][i] = vector_add(W_0[j][i], dW);
 
                         all_Res[j - 2][i] = Res;
                         all_dw[j - 2][i] = dW;
                         q[j - 2][i] = current_state.W[j][i];
+                        // if (j==2) {
+                        //     std::cout << i << std::endl;
+                        //     std::cout << dt << std::endl;
+                        //     std::cout << dW[0] << " " << dW[1] << " " << dW[2] << " " << dW[3] << " " << std::endl;
+                        //     std::cout << current_state.W[j][i][0] << " " << current_state.W[j][i][1] << " " << current_state.W[j][i][2] << " " << current_state.W[j][i][3] << " " << std::endl;
+                        //     std::cout << std::endl;
+                        // }
                     }
                 }
                 current_state.run_odd();
             }
             else {
-                std::vector<double> a_I((ny - 4)*nx);
-                std::vector<double> b_I((ny - 4)*nx);
-                std::vector<double> a_J((ny - 4)*nx);
-                std::vector<double> b_J((ny - 4)*nx);
                 std::vector d((ny - 4)*nx, std::vector<double>(4));
 
+                auto dt = compute_dt();
+                std::vector<std::vector<std::vector<double>>> W_0 = current_state.W;
                 // Stage 1
                 #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
-                        auto [eps_I, eps_J] = compute_eps(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
-                                                    current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                        double dt_loc = dt[j][i];
                         const std::vector<double>& Rd0 = current_state.R_d0[j-2][i];
-                        std::vector<double> Res = vector_subtract(current_state.R_c[j - 2][i], Rd0);
-                        a_I[(j-2)*nx + i] = -eps_I;
-                        b_I[(j-2)*nx + i] = 1 + 2*eps_I;
-                        a_J[(j-2)*nx + i] = -eps_J;
-                        b_J[(j-2)*nx + i] = 1 + 2*eps_J;
-                        d[(j-2)*nx + i] = Res;
+                        std::vector<double> Res = vector_scale(1/current_state.OMEGA[j][i], vector_subtract(current_state.R_c[j - 2][i], Rd0));
+                        std::vector<double> dW = vector_scale(dt_loc, Res);
+                        d[(j-2)*nx + i] = dW;
                     }
                 }
-                std::vector<std::vector<double>> R_star = thomasAlgorithm(a_I, b_I, a_I, d);
-                std::vector<std::vector<double>> R_star_star = thomasAlgorithm(a_J, b_J, a_J, R_star);
+                auto [a_I, b_I, c_I, a_J, b_J, c_J] = compute_abc();
+                std::vector<std::vector<double>> R_star = thomasAlgorithm(a_I, b_I, c_I, d);
+                R_star = reshapeColumnWise(R_star, ny-4, nx);
+                std::vector<std::vector<double>> R_star_star = thomasAlgorithm(a_J, b_J, c_J, R_star);
+
                 #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
-                        double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
-                                                    current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
-                        std::vector<double> dW = vector_scale(-a1 * dt / current_state.OMEGA[j][i], R_star_star[(j-2)*nx + i]);
-                        current_state.W[j][i] = vector_add(current_state.W[j][i], dW) ;
+                        std::vector<double> dW = vector_scale(a1, R_star_star[i*nx + (j-2)]);
+                        current_state.W[j][i] = vector_subtract(W_0[j][i], dW);
                     }
                 }
                 current_state.run_odd();
@@ -427,55 +474,48 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
-                        auto [eps_I, eps_J] = compute_eps(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
-                                                    current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                        double dt_loc = dt[j][i];
                         const std::vector<double>& Rd0 = current_state.R_d0[j-2][i];
-                        std::vector<double> Res = vector_subtract(current_state.R_c[j - 2][i], Rd0);
-                        a_I[(j-2)*nx + i] = -eps_I;
-                        b_I[(j-2)*nx + i] = 1 + 2*eps_I;
-                        a_J[(j-2)*nx + i] = -eps_J;
-                        b_J[(j-2)*nx + i] = 1 + 2*eps_J;
-                        d[(j-2)*nx + i] = Res;
+                        std::vector<double> Res = vector_scale(1/current_state.OMEGA[j][i], vector_subtract(current_state.R_c[j - 2][i], Rd0));
+                        std::vector<double> dW = vector_scale(dt_loc, Res);
+                        d[(j-2)*nx + i] = dW;
                     }
                 }
-                R_star = thomasAlgorithm(a_I, b_I, a_I, d);
-                R_star_star = thomasAlgorithm(a_J, b_J, a_J, R_star);
+                std::tie(a_I, b_I, c_I, a_J, b_J, c_J) = compute_abc();
+                R_star = thomasAlgorithm(a_I, b_I, c_I, d);
+                R_star = reshapeColumnWise(R_star, ny-4, nx);
+                R_star_star = thomasAlgorithm(a_J, b_J, c_J, R_star);
                 #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
-                        double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
-                                                    current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
-                        std::vector<double> dW = vector_scale(-a2 * dt / current_state.OMEGA[j][i], R_star_star[(j-2)*nx + i]);
-                        current_state.W[j][i] = vector_add(current_state.W[j][i], dW) ;
+                        std::vector<double> dW = vector_scale(a2, R_star_star[i*nx + (j-2)]);
+                        current_state.W[j][i] = vector_subtract(W_0[j][i], dW);
                     }
                 }
                 current_state.run_even();
 
                 // Stage 3
+                // #pragma omp parallel for
                 #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
-                        auto [eps_I, eps_J] = compute_eps(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
-                                                    current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                        double dt_loc = dt[j][i];
                         const std::vector<double> Rd20 = vector_add(vector_scale(b3, current_state.R_d[j-2][i]), vector_scale(1-b3, current_state.R_d0[j-2][i]));
                         current_state.R_d0[j-2][i] = Rd20;
-                        std::vector<double> Res = vector_subtract(current_state.R_c[j - 2][i], Rd20);
-                        a_I[(j-2)*nx + i] = -eps_I;
-                        b_I[(j-2)*nx + i] = 1 + 2*eps_I;
-                        a_J[(j-2)*nx + i] = -eps_J;
-                        b_J[(j-2)*nx + i] = 1 + 2*eps_J;
-                        d[(j-2)*nx + i] = Res;
+                        std::vector<double> Res = vector_scale(1/current_state.OMEGA[j][i], vector_subtract(current_state.R_c[j - 2][i], Rd20));
+                        std::vector<double> dW = vector_scale(dt_loc, Res);
+                        d[(j-2)*nx + i] = dW;
                     }
                 }
-                R_star = thomasAlgorithm(a_I, b_I, a_I, d);
-                R_star_star = thomasAlgorithm(a_J, b_J, a_J, R_star);
+                std::tie(a_I, b_I, c_I, a_J, b_J, c_J) = compute_abc();
+                R_star = thomasAlgorithm(a_I, b_I, c_I, d);
+                R_star = reshapeColumnWise(R_star, ny-4, nx);
+                R_star_star = thomasAlgorithm(a_J, b_J, c_J, R_star);
                 #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
-                        double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
-                                                    current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
-                        std::vector<double> dW = vector_scale(-a3 * dt / current_state.OMEGA[j][i], R_star_star[(j-2)*nx + i]);
-                        current_state.W[j][i] = vector_add(current_state.W[j][i], dW) ;
+                        std::vector<double> dW = vector_scale(a3, R_star_star[i*nx + (j-2)]);
+                        current_state.W[j][i] = vector_subtract(W_0[j][i], dW);
                     }
                 }
                 current_state.run_odd();
@@ -484,26 +524,22 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
-                        auto [eps_I, eps_J] = compute_eps(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
-                                                    current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                        double dt_loc = dt[j][i];
                         const std::vector<double>& Rd20 = current_state.R_d0[j-2][i];
-                        std::vector<double> Res = vector_subtract(current_state.R_c[j - 2][i], Rd20);
-                        a_I[(j-2)*nx + i] = -eps_I;
-                        b_I[(j-2)*nx + i] = 1 + 2*eps_I;
-                        a_J[(j-2)*nx + i] = -eps_J;
-                        b_J[(j-2)*nx + i] = 1 + 2*eps_J;
-                        d[(j-2)*nx + i] = Res;
+                        std::vector<double> Res = vector_scale(1/current_state.OMEGA[j][i], vector_subtract(current_state.R_c[j - 2][i], Rd20));
+                        std::vector<double> dW = vector_scale(dt_loc, Res);
+                        d[(j-2)*nx + i] = dW;
                     }
                 }
-                R_star = thomasAlgorithm(a_I, b_I, a_I, d);
-                R_star_star = thomasAlgorithm(a_J, b_J, a_J, R_star);
+                std::tie(a_I, b_I, c_I, a_J, b_J, c_J) = compute_abc();
+                R_star = thomasAlgorithm(a_I, b_I, c_I, d);
+                R_star = reshapeColumnWise(R_star, ny-4, nx);
+                R_star_star = thomasAlgorithm(a_J, b_J, c_J, R_star);
                 #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
-                        double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
-                                                    current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
-                        std::vector<double> dW = vector_scale(-a4 * dt / current_state.OMEGA[j][i], R_star_star[(j-2)*nx + i]);
-                        current_state.W[j][i] = vector_add(current_state.W[j][i], dW) ;
+                        std::vector<double> dW = vector_scale(a4, R_star_star[i*nx + (j-2)]);
+                        current_state.W[j][i] = vector_subtract(W_0[j][i], dW);
                     }
                 }
                 current_state.run_even();
@@ -512,29 +548,24 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
                 #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
-                        auto [eps_I, eps_J] = compute_eps(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
-                                                    current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
+                        double dt_loc = dt[j][i];
                         const std::vector<double> Rd42 = vector_add(vector_scale(b5, current_state.R_d[j-2][i]), vector_scale(1-b5, current_state.R_d0[j-2][i]));
                         current_state.R_d0[j-2][i] = Rd42;
-                        std::vector<double> Res = vector_subtract(current_state.R_c[j - 2][i], Rd42);
-                        a_I[(j-2)*nx + i] = -eps_I;
-                        b_I[(j-2)*nx + i] = 1 + 2*eps_I;
-                        a_J[(j-2)*nx + i] = -eps_J;
-                        b_J[(j-2)*nx + i] = 1 + 2*eps_J;
-                        d[(j-2)*nx + i] = Res;
+                        std::vector<double> Res = vector_subtract(current_state.R_c[j-2][i], Rd42);
+                        std::vector<double> dW = vector_scale(dt_loc / current_state.OMEGA[j][i], Res);
+                        d[(j-2)*nx + i] = dW;
                     }
                 }
-                R_star = thomasAlgorithm(a_I, b_I, a_I, d);
-                R_star_star = thomasAlgorithm(a_J, b_J, a_J, R_star);
+                std::tie(a_I, b_I, c_I, a_J, b_J, c_J) = compute_abc();
+                R_star = thomasAlgorithm(a_I, b_I, c_I, d);
+                R_star = reshapeColumnWise(R_star, ny-4, nx);
+                R_star_star = thomasAlgorithm(a_J, b_J, c_J, R_star);
                 #pragma omp parallel for
                 for (int j = 2; j < ny - 2; ++j) {
                     for (int i = 0; i < nx; ++i) {
-                        double dt = compute_dt(current_state.W[j][i], current_state.OMEGA[j][i], current_state.n[j][i][0], current_state.n[j][(i + 1) % nx][1], current_state.n[j+1][i][0], current_state.n[j][i][1],
-                                                    current_state.Ds[j][i][0], current_state.Ds[j][(i + 1) % nx][1], current_state.Ds[j+1][i][0], current_state.Ds[j][i][1]);
-                        std::vector<double> dW = vector_scale(-a3 * dt / current_state.OMEGA[j][i], R_star_star[(j-2)*nx + i]);
-                        current_state.W[j][i] = vector_add(current_state.W[j][i], dW) ;
+                        std::vector<double> dW = vector_scale(a5, R_star_star[i*nx + (j-2)]);
+                        current_state.W[j][i] = vector_subtract(W_0[j][i], dW);
 
-                        all_Res[j - 2][i] = R_star_star[(j-2)*nx + i];
                         all_dw[j - 2][i] = dW;
                         q[j - 2][i] = current_state.W[j][i];
                     }
@@ -554,11 +585,13 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
             iteration.push_back(it);
             Residuals.push_back(l2_norm);
 
-            std::cout << "Iteration " << it << ": L2 Norms = ";
+            auto [C_L, C_D, C_M] = compute_coeff();
+
+            std::cout << "It " << it << ": L2 Norms = ";
             for (const auto &norm : normalized_residuals) {
                 std::cout << norm << " ";
             }
-            std::cout << std::endl;
+            std::cout << "C_L:" << C_L << " C_D:" << C_D << " C_M:" << C_M << std::endl;
 
             // Check for convergence
             if (*std::ranges::max_element(normalized_residuals) <= 1e-11) {
@@ -599,6 +632,36 @@ std::tuple<std::vector<std::vector<std::vector<double>>>,
     return std::make_tuple(q, q_vertex, Residuals);
 }
 
-void TemporalDiscretization::run() {
-    auto[q, q_vertex, Residuals] = TemporalDiscretization::RungeKutta();
+std::tuple<double, double, double> TemporalDiscretization::compute_coeff() {
+    double x_ref = 0.25;
+    double y_ref = 0.0;
+    double c = 1.0;
+    int nx = current_state.W[0].size();
+    std::vector<double> p_array(nx);
+    double Fx = 0.0;
+    double Fy = 0.0;
+    double M = 0.0;
+    for (int i = 0; i < nx; ++i) {
+        double& rho = current_state.W[2][i][0];
+        double& rho_u = current_state.W[2][i][1];
+        double& rho_v = current_state.W[2][i][2];
+        double& rho_E = current_state.W[2][i][3];
+        double p = (1.4-1)*(rho_E-0.5*(rho_u*rho_u+rho_v*rho_v)/rho);
+        Fx += p*current_state.n[2][i][0][0]*current_state.Ds[2][i][0];
+        Fy += p*current_state.n[2][i][0][1]*current_state.Ds[2][i][0];
+
+        double x_mid = 0.5*(current_state.x[0][i] + current_state.x[0][i+1]);
+        double y_mid = 0.5*(current_state.y[0][i] + current_state.y[0][i+1]);
+        M += p*(-(x_mid-x_ref)*current_state.n[2][i][0][1] + (y_mid-y_ref)*current_state.n[2][i][0][0])*current_state.Ds[2][i][0];
+    }
+
+    double L = Fy*std::cos(current_state.alpha) - Fx*std::sin(current_state.alpha);
+    double D = Fy*std::sin(current_state.alpha) + Fx*std::cos(current_state.alpha);
+
+    double C_L = L/(0.5*rho*(u*u+v*v)*c);
+    double C_D = D/(0.5*rho*(u*u+v*v)*c);
+    double C_M = M/(0.5*rho*(u*u+v*v)*c*c);
+
+    return std::tie<double>(C_L, C_D, C_M);
 }
+
